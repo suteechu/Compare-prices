@@ -1,12 +1,616 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="th">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Project Manager Mock UI</title>
-  </head>
-  <body class="antialiased bg-neutral-50 text-neutral-900">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Construction Cost Estimator Pro V8.4 (Fixed)</title>
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+
+    <!-- html2pdf.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        body, .font-sans, .font-mono { font-family: 'IBM Plex Sans Thai', sans-serif !important; }
+        body { background-color: #f1f5f9; }
+        .hide-print { display: block; }
+        @media print {
+            .hide-print { display: none !important; }
+            .page-break { page-break-inside: avoid; }
+            body { background-color: white; }
+            .fixed-footer { position: relative !important; margin-top: 2rem; border-top: 2px solid #333 !important; }
+        }
+        .generating-pdf .hide-print { display: none !important; }
+        .generating-pdf .fixed-footer { position: relative !important; margin-top: 20px; background: white !important; }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .fade-in { animation: fadeIn 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
+        .slide-up { animation: slideUp 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    </style>
+</head>
+<body>
     <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo, useRef } = React;
+
+        // Configuration
+        const INITIAL_CATEGORIES_DEFAULT = [
+            { id: 'cat_01', name: '1. งานหลังคา', icon: 'ph-house-line', color: 'bg-indigo-100 text-indigo-700' },
+            { id: 'cat_02', name: '2. งานโครงสร้าง(ST)', icon: 'ph-columns', color: 'bg-slate-200 text-slate-700' },
+            { id: 'cat_03', name: '3. งานผนังภายนอก(EW)', icon: 'ph-wall', color: 'bg-orange-100 text-orange-700' },
+            { id: 'cat_04', name: '4. งานผนังภายใน(IW)', icon: 'ph-squares-four', color: 'bg-amber-100 text-amber-700' },
+            { id: 'cat_05', name: '5. งานประตู(Door)', icon: 'ph-door', color: 'bg-sky-100 text-sky-700' },
+            { id: 'cat_06', name: '6. งานหน้าต่าง(Windows)', icon: 'ph-windows-logo', color: 'bg-cyan-100 text-cyan-700' },
+            { id: 'cat_07', name: '7. งานไฟฟ้า(EE)', icon: 'ph-lightbulb-filament', color: 'bg-yellow-100 text-yellow-700' },
+            { id: 'cat_08', name: '8. งานประปา(ME)', icon: 'ph-drop', color: 'bg-blue-100 text-blue-700' },
+            { id: 'cat_09', name: '9. งานพื้นห้อง(Floor F)', icon: 'ph-squares-filled', color: 'bg-emerald-100 text-emerald-700' },
+            { id: 'cat_10', name: '10. งานฝ้า', icon: 'ph-layers', color: 'bg-gray-100 text-gray-700' },
+        ];
+
+        const formatMoney = (amount) => new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB', maximumFractionDigits: 0 }).format(amount);
+        const formatNumber = (num) => new Intl.NumberFormat('th-TH', { maximumFractionDigits: 2 }).format(num);
+
+        // Components
+        const Toast = ({ message, onClose }) => {
+            useEffect(() => { const timer = setTimeout(onClose, 2000); return () => clearTimeout(timer); }, [onClose]);
+            return (
+                <div className="fixed top-4 right-4 z-[999] bg-gray-900 text-white px-6 py-3 rounded-lg shadow-xl flex items-center gap-3 slide-up border border-gray-700">
+                    <i className="ph-fill ph-check-circle text-green-400 text-xl"></i>
+                    <span className="font-medium text-sm">{message}</span>
+                </div>
+            );
+        };
+
+        const DonutChart = ({ data, total }) => {
+            const chartRef = useRef(null);
+            const chartInstance = useRef(null);
+            useEffect(() => {
+                if (total <= 0) return;
+                const ctx = chartRef.current.getContext('2d');
+                if (chartInstance.current) chartInstance.current.destroy();
+                chartInstance.current = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: data.map(d => d.name),
+                        datasets: [{
+                            data: data.map(d => d.value),
+                            backgroundColor: ['#4f46e5', '#64748b', '#f97316', '#d97706', '#0ea5e9', '#06b6d4', '#eab308', '#2563eb', '#10b981', '#6b7280', '#ec4899', '#8b5cf6'],
+                            borderWidth: 0,
+                            hoverOffset: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => ` ${ctx.label}: ${formatMoney(ctx.raw)} (${((ctx.raw/total)*100).toFixed(1)}%)` }, bodyFont: { family: "'IBM Plex Sans Thai', sans-serif" } } },
+                        cutout: '70%'
+                    }
+                });
+                return () => { if (chartInstance.current) chartInstance.current.destroy(); };
+            }, [data, total]);
+            if (total <= 0) return null;
+            return (
+                <div className="relative h-40 w-40 mx-auto">
+                    <canvas ref={chartRef}></canvas>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                        <span className="text-[10px] text-gray-400 font-medium uppercase tracking-wide">Direct Cost</span>
+                        <span className="text-xs font-bold text-gray-800">{formatNumber(total/1000000)}M</span>
+                    </div>
+                </div>
+            );
+        };
+
+        const CostDistributionBar = ({ data, total }) => {
+            if (total <= 0) return null;
+            const colors = ['bg-indigo-600', 'bg-slate-500', 'bg-orange-500', 'bg-amber-600', 'bg-sky-500', 'bg-cyan-500', 'bg-yellow-500', 'bg-blue-600', 'bg-emerald-500', 'bg-gray-500'];
+            return (
+                <div className="mt-4">
+                    <div className="flex h-2.5 rounded-full overflow-hidden w-full bg-gray-100">
+                        {data.map((d, i) => {
+                            const width = (d.value / total) * 100;
+                            return width > 0 ? <div key={i} className={`${colors[i % colors.length]} h-full`} style={{ width: `${width}%` }} title={`${d.name}: ${width.toFixed(1)}%`}></div> : null;
+                        })}
+                    </div>
+                    <div className="flex justify-between text-[10px] text-gray-400 mt-1"><span>0%</span><span>50%</span><span>100%</span></div>
+                </div>
+            );
+        };
+
+        const PyramidChart = ({ scenarios, scenarioIds, scenarioMeta, categories }) => {
+            const chartRef = useRef(null);
+            const chartInstance = useRef(null);
+            useEffect(() => {
+                if (scenarioIds.length < 2) return;
+                const ctx = chartRef.current.getContext('2d');
+                const id1 = scenarioIds[0];
+                const id2 = scenarioIds[1];
+                const data1 = categories.map(cat => (scenarios[id1]?.[cat.id]?.[0]?.total || 0));
+                const data2 = categories.map(cat => (scenarios[id2]?.[cat.id]?.[0]?.total || 0));
+
+                if (chartInstance.current) chartInstance.current.destroy();
+                chartInstance.current = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: categories.map(c => c.name),
+                        datasets: [
+                            { label: scenarioMeta[id1]?.name, data: data1.map(v => -v), backgroundColor: 'rgba(79, 70, 229, 0.8)', borderRadius: 4, barPercentage: 0.6 },
+                            { label: scenarioMeta[id2]?.name, data: data2, backgroundColor: 'rgba(16, 185, 129, 0.8)', borderRadius: 4, barPercentage: 0.6 }
+                        ]
+                    },
+                    options: {
+                        indexAxis: 'y',
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: { x: { stacked: true, ticks: { callback: (val) => Math.abs(val).toLocaleString(), font: { family: "'IBM Plex Sans Thai', sans-serif", size: 10 } }, grid: { color: '#f1f5f9' } }, y: { stacked: true, grid: { display: false }, ticks: { font: { family: "'IBM Plex Sans Thai', sans-serif", size: 11, weight: 500 } } } },
+                        plugins: { tooltip: { callbacks: { label: (ctx) => ` ${ctx.dataset.label}: ${Math.abs(ctx.parsed.x).toLocaleString()} บาท` }, bodyFont: { family: "'IBM Plex Sans Thai', sans-serif" } }, legend: { labels: { font: { family: "'IBM Plex Sans Thai', sans-serif" } } } }
+                    }
+                });
+                return () => { if (chartInstance.current) chartInstance.current.destroy(); };
+            }, [scenarios, scenarioIds, scenarioMeta, categories]);
+            if (scenarioIds.length < 2) return <div className="p-8 text-center text-gray-400 border-dashed border-2 rounded-lg">ต้องการ 2 Module เพื่อเปรียบเทียบ</div>;
+            return <div className="h-[350px] w-full p-2"><canvas ref={chartRef}></canvas></div>;
+        };
+
+        const ComparisonCard = ({ currentTotal, compareTotal, currentName, compareName }) => {
+            if (!compareTotal || compareTotal === 0) return null;
+            const diff = currentTotal - compareTotal;
+            const percent = (Math.abs(diff) / compareTotal) * 100;
+            const isCheaper = diff < 0;
+            return (
+                <div className={`p-4 rounded-2xl border flex items-center justify-between shadow-sm ${isCheaper ? 'bg-green-50 border-green-100' : 'bg-red-50 border-red-100'}`}>
+                    <div>
+                        <div className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">เทียบกับ {compareName}</div>
+                        <div className={`text-lg font-bold flex items-center gap-2 ${isCheaper ? 'text-green-700' : 'text-red-700'}`}>
+                            {isCheaper ? <i className="ph-fill ph-arrow-down"></i> : <i className="ph-fill ph-arrow-up"></i>} {isCheaper ? 'ถูกกว่า' : 'แพงกว่า'} {percent.toFixed(1)}%
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1">ส่วนต่าง {formatMoney(Math.abs(diff))}</div>
+                    </div>
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isCheaper ? 'bg-green-200 text-green-700' : 'bg-red-200 text-red-700'}`}><i className={`ph-fill ${isCheaper ? 'ph-thumbs-up' : 'ph-trend-up'} text-xl`}></i></div>
+                </div>
+            );
+        };
+
+        const App = () => {
+            const [activeTab, setActiveTab] = useState(1);
+            const [isExporting, setIsExporting] = useState(false);
+            const [editingTab, setEditingTab] = useState(null);
+            const [editNameValue, setEditNameValue] = useState("");
+            const [toastMessage, setToastMessage] = useState(null);
+            const [projectName, setProjectName] = useState("โครงการบ้านพักอาศัย");
+            const [isEditingTitle, setIsEditingTitle] = useState(false);
+
+            // Categories State
+            const [categories, setCategories] = useState(() => {
+                const saved = localStorage.getItem('costEstimatorCategoriesV8');
+                return saved ? JSON.parse(saved) : INITIAL_CATEGORIES_DEFAULT;
+            });
+
+            // Data State
+            const [scenarios, setScenarios] = useState(() => {
+                const saved = localStorage.getItem('costEstimatorDataV8');
+                const defaultScenarios = { 1: {}, 2: {} };
+                INITIAL_CATEGORIES_DEFAULT.forEach(cat => {
+                    defaultScenarios[1][cat.id] = [];
+                    defaultScenarios[2][cat.id] = [];
+                });
+                return saved ? JSON.parse(saved) : defaultScenarios;
+            });
+
+            const [scenarioMeta, setScenarioMeta] = useState(() => {
+                const saved = localStorage.getItem('costEstimatorMetaV8');
+                return saved ? JSON.parse(saved) : { 
+                    1: { area: 100, name: 'Module A', coverImage: null, markup: 0 }, 
+                    2: { area: 100, name: 'Module B', coverImage: null, markup: 0 } 
+                };
+            });
+            
+            // Bulk Items (UI State) - Use string for total to allow smooth typing
+            const [bulkItems, setBulkItems] = useState([]);
+            
+            const coverInputRef = useRef(null);
+            const scrollRef = useRef(null);
+
+            // Persist Data
+            useEffect(() => {
+                localStorage.setItem('costEstimatorDataV8', JSON.stringify(scenarios));
+                localStorage.setItem('costEstimatorMetaV8', JSON.stringify(scenarioMeta));
+                localStorage.setItem('costEstimatorCategoriesV8', JSON.stringify(categories));
+            }, [scenarios, scenarioMeta, categories]);
+
+            // Sync UI from Storage when changing tabs
+            useEffect(() => {
+                if (activeTab === 'compare') return;
+                const currentData = scenarios[activeTab] || {};
+                const loadedItems = categories.map(cat => {
+                    const existing = currentData[cat.id]?.[0];
+                    return {
+                        categoryId: cat.id,
+                        total: existing ? existing.total.toString() : "" // Use string for input value
+                    };
+                });
+                setBulkItems(loadedItems);
+            }, [activeTab, categories, scenarios]); // Re-sync if scenarios change externally (e.g. auto fill)
+
+            const scenarioIds = useMemo(() => Object.keys(scenarios).map(Number).sort((a, b) => a - b), [scenarios]);
+
+            const handleAddCategory = () => {
+                const newCat = { id: `cat_${Date.now()}`, name: 'หมวดหมู่ใหม่', icon: 'ph-circles-four', color: 'bg-gray-100 text-gray-700' };
+                setCategories([...categories, newCat]);
+                setToastMessage("เพิ่มหมวดหมู่ใหม่แล้ว");
+            };
+
+            const handleDeleteCategory = (catId) => {
+                if (categories.length <= 1) return alert("ต้องมีอย่างน้อย 1 หมวดหมู่");
+                if (!confirm("ยืนยันลบหมวดหมู่นี้?")) return;
+                setCategories(categories.filter(c => c.id !== catId));
+                setToastMessage("ลบหมวดหมู่แล้ว");
+            };
+
+            const handleCategoryNameChange = (catId, newName) => {
+                setCategories(categories.map(c => c.id === catId ? { ...c, name: newName } : c));
+            };
+
+            const handleBulkChange = (index, value) => {
+                const newItems = [...bulkItems];
+                newItems[index] = { ...newItems[index], total: value };
+                setBulkItems(newItems);
+            };
+
+            const resetRow = (index) => {
+                const newItems = [...bulkItems];
+                newItems[index] = { ...newItems[index], total: "" };
+                setBulkItems(newItems);
+            };
+
+            const handleMetaChange = (id, field, value) => {
+                setScenarioMeta(prev => ({ ...prev, [id]: { ...prev[id], [field]: (field === 'area' || field === 'markup') ? (parseFloat(value) || 0) : value } }));
+            };
+
+            const handleCoverImageUpload = (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onloadend = () => handleMetaChange(activeTab, 'coverImage', reader.result);
+                    reader.readAsDataURL(file);
+                }
+            };
+
+            const saveEditName = () => {
+                if (editingTab !== null) {
+                    const newName = editNameValue.trim() || `Module ${editingTab}`;
+                    handleMetaChange(editingTab, 'name', newName);
+                    setEditingTab(null);
+                }
+            };
+
+            const addScenario = () => {
+                const newId = (Math.max(...scenarioIds) || 0) + 1;
+                setScenarios(prev => ({ ...prev, [newId]: {} })); 
+                setScenarioMeta(prev => ({ ...prev, [newId]: { area: 100, name: `Module ${newId}`, coverImage: null, markup: 0 } }));
+                setActiveTab(newId);
+                setToastMessage("เพิ่ม Module ใหม่เรียบร้อย");
+            };
+
+            const deleteScenario = (id) => {
+                if (scenarioIds.length <= 1) return alert("ต้องมีอย่างน้อย 1 Module");
+                if (confirm(`ยืนยันลบ "${scenarioMeta[id]?.name}"?`)) {
+                    const newScenarios = { ...scenarios }; delete newScenarios[id];
+                    const newMeta = { ...scenarioMeta }; delete newMeta[id];
+                    setScenarios(newScenarios);
+                    setScenarioMeta(newMeta);
+                    if (activeTab === id) setActiveTab(Number(Object.keys(newScenarios)[0]) || 1);
+                    setToastMessage("ลบ Module เรียบร้อย");
+                }
+            };
+
+            const generateTestData = () => {
+                if (!confirm("สร้างข้อมูลทดสอบทับข้อมูลปัจจุบัน?")) return;
+                
+                const testData = {};
+                const newBulkItems = [];
+
+                categories.forEach(cat => {
+                    let price = 0;
+                    if (cat.name.includes('โครงสร้าง') || cat.id.includes('cat_02')) price = 350000;
+                    else if (cat.name.includes('หลังคา')) price = 120000;
+                    else if (cat.name.includes('ผนัง')) price = 80000;
+                    else price = Math.floor(Math.random() * 50000) + 10000;
+
+                    testData[cat.id] = [{ 
+                        id: Date.now() + Math.random(), 
+                        name: cat.name, 
+                        categoryId: cat.id, 
+                        qty: 1, unit: 'เหมา', pricePerUnit: price, 
+                        total: price 
+                    }];
+                    
+                    newBulkItems.push({
+                        categoryId: cat.id,
+                        total: price
+                    });
+                });
+
+                // Update Storage State
+                setScenarios(prev => ({ ...prev, [activeTab]: testData }));
+                setScenarioMeta(prev => ({ ...prev, [activeTab]: { ...prev[activeTab], area: 150, markup: 10 } }));
+                
+                // Update UI State Immediately
+                setBulkItems(newBulkItems);
+
+                setToastMessage("สร้างข้อมูลจำลอง (Auto Fill) เรียบร้อย");
+            };
+
+            const saveBulkItems = () => {
+                setScenarios(prev => {
+                    const updatedScenario = { ...prev[activeTab] };
+                    bulkItems.forEach(item => {
+                        const val = parseFloat(item.total) || 0;
+                        const catInfo = categories.find(c => c.id === item.categoryId);
+                        if(catInfo) {
+                            updatedScenario[item.categoryId] = [{ id: Date.now(), name: catInfo.name, total: val }];
+                        }
+                    });
+                    return { ...prev, [activeTab]: updatedScenario };
+                });
+                setToastMessage("บันทึกข้อมูลเรียบร้อย");
+            };
+
+            const removeItem = (catId) => {
+                setScenarios(prev => ({ ...prev, [activeTab]: { ...prev[activeTab], [catId]: [] } }));
+                setToastMessage("ลบรายการแล้ว");
+            };
+
+            const clearAll = () => {
+                if (confirm('ล้างข้อมูลทั้งหมด?')) {
+                    setScenarios({ 1: {}, 2: {} });
+                    setCategories(INITIAL_CATEGORIES_DEFAULT);
+                    setScenarioMeta({ 1: { area: 100, name: 'Module A' }, 2: { area: 100, name: 'Module B' } });
+                    setActiveTab(1);
+                    setToastMessage("รีเซ็ตระบบเรียบร้อย");
+                }
+            };
+
+            // Calculations
+            const getCategoryTotal = (scenId, catId) => scenarios[scenId]?.[catId]?.reduce((s, i) => s + i.total, 0) || 0;
+            const getDirectTotal = (scenId) => categories.reduce((s, c) => s + getCategoryTotal(scenId, c.id), 0);
+            const getGrandTotal = (scenId) => getDirectTotal(scenId) * (1 + (scenarioMeta[scenId]?.markup || 0) / 100);
+
+            const currentDirectTotal = useMemo(() => activeTab === 'compare' ? 0 : getDirectTotal(activeTab), [scenarios, activeTab, categories]);
+            const currentGrandTotal = useMemo(() => activeTab === 'compare' ? 0 : getGrandTotal(activeTab), [scenarios, activeTab, categories, scenarioMeta]);
+            const liveBulkTotal = useMemo(() => bulkItems.reduce((s, i) => s + (parseFloat(i.total) || 0), 0), [bulkItems]);
+
+            const chartData = useMemo(() => {
+                if (activeTab === 'compare') return [];
+                return categories.map(cat => ({ name: cat.name, value: getCategoryTotal(activeTab, cat.id) })).filter(d => d.value > 0);
+            }, [scenarios, activeTab, categories]);
+
+            const otherScenarioId = useMemo(() => scenarioIds.find(id => id !== activeTab), [scenarioIds, activeTab]);
+            const compareTotal = otherScenarioId ? getGrandTotal(otherScenarioId) : 0;
+            const compareName = otherScenarioId ? scenarioMeta[otherScenarioId]?.name : '';
+            
+            const handleDownloadPDF = async () => {
+                setIsExporting(true);
+                document.body.classList.add('generating-pdf');
+                await new Promise(r => setTimeout(r, 500));
+                const element = document.getElementById('root');
+                const opt = { margin: 5, filename: `${projectName}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' } };
+                html2pdf().set(opt).from(element).save().then(() => { document.body.classList.remove('generating-pdf'); setIsExporting(false); setToastMessage("ดาวน์โหลด PDF แล้ว"); });
+            };
+
+            const copyToOtherModule = () => {
+                const targetId = scenarioIds.find(id => id !== activeTab);
+                if (!targetId) return alert("ต้องมี Module อื่นเพื่อคัดลอกไป");
+                if (!confirm(`ต้องการคัดลอกไปยัง "${scenarioMeta[targetId].name}"?`)) return;
+                setScenarios(prev => ({ ...prev, [targetId]: JSON.parse(JSON.stringify(scenarios[activeTab])) }));
+                setScenarioMeta(prev => ({ ...prev, [targetId]: { ...prev[targetId], area: prev[activeTab].area, coverImage: prev[activeTab].coverImage, markup: prev[activeTab].markup } }));
+                setToastMessage(`คัดลอกข้อมูลแล้ว`);
+            };
+
+            const exportData = () => {
+                const data = { version: "V8.4", projectName, scenarios, scenarioMeta, categories };
+                const blob = new Blob([JSON.stringify(data)], {type: "application/json"});
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a'); a.href = url; a.download = `CostEstimator_${projectName}_Backup.json`; a.click();
+            };
+            const importData = (e) => {
+                const file = e.target.files[0]; if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    try {
+                        const data = JSON.parse(event.target.result);
+                        if (data.scenarios) {
+                            setProjectName(data.projectName || "Project"); setScenarios(data.scenarios); setScenarioMeta(data.scenarioMeta); if(data.categories) setCategories(data.categories);
+                            setActiveTab(Number(Object.keys(data.scenarios)[0]) || 1); setToastMessage("นำเข้าข้อมูลสำเร็จ");
+                        }
+                    } catch (err) { alert("ไฟล์ไม่ถูกต้อง"); }
+                };
+                reader.readAsText(file); e.target.value = '';
+            };
+
+            return (
+                <div className="min-h-screen pb-40 bg-gray-50 text-gray-800 font-sans">
+                    {toastMessage && <Toast message={toastMessage} onClose={() => setToastMessage(null)} />}
+                    
+                    <header className="bg-white shadow-sm sticky top-0 z-20 print:static print:shadow-none border-b border-gray-200">
+                        <div className="max-w-6xl mx-auto px-4 py-3">
+                            <div className="flex flex-col md:flex-row justify-between items-center mb-4 gap-3">
+                                <div className="flex items-center gap-3 w-full md:w-auto">
+                                    <div className="bg-indigo-600 text-white p-2.5 rounded-xl shadow-lg shadow-indigo-200"><i className="ph-duotone ph-buildings text-2xl"></i></div>
+                                    <div>
+                                        {isEditingTitle ? <input autoFocus type="text" value={projectName} onChange={(e) => setProjectName(e.target.value)} onBlur={() => setIsEditingTitle(false)} className="text-xl font-extrabold text-gray-900 border-b-2 border-indigo-500 outline-none bg-transparent" /> : <h1 onClick={() => setIsEditingTitle(true)} className="text-xl font-extrabold text-gray-900 leading-none tracking-tight cursor-pointer hover:text-indigo-600 transition flex items-center gap-2" title="คลิกเพื่อเปลี่ยนชื่อโครงการ">{projectName} <i className="ph-bold ph-pencil-simple text-xs text-gray-400"></i></h1>}
+                                        <p className="text-xs text-gray-500 font-medium mt-0.5">Construction Cost Estimator Pro V8.4</p>
+                                    </div>
+                                </div>
+                                <div className="flex gap-2 hide-print w-full md:w-auto overflow-x-auto pb-1 no-scrollbar">
+                                    <button onClick={exportData} className="p-2.5 bg-white text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition shadow-sm" title="Backup"><i className="ph-bold ph-download-simple text-lg"></i></button>
+                                    <label className="p-2.5 bg-white text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition shadow-sm cursor-pointer" title="Restore"><i className="ph-bold ph-upload-simple text-lg"></i><input type="file" onChange={importData} className="hidden" accept=".json" /></label>
+                                    <div className="w-px h-8 bg-gray-200 mx-1"></div>
+                                    {activeTab !== 'compare' && (
+                                        <>
+                                            <button onClick={generateTestData} className="px-3 py-2 bg-amber-50 text-amber-700 rounded-lg hover:bg-amber-100 transition shadow-sm border border-amber-200 flex items-center gap-2 font-bold text-sm" title="Auto Fill"><i className="ph-fill ph-magic-wand text-lg"></i> Auto Fill</button>
+                                            <button onClick={copyToOtherModule} className="p-2.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition shadow-sm border border-blue-100" title="Copy"><i className="ph-bold ph-copy text-lg"></i></button>
+                                        </>
+                                    )}
+                                    <button onClick={clearAll} className="p-2.5 text-gray-400 hover:text-red-500 transition hover:bg-red-50 rounded-lg"><i className="ph ph-trash text-lg"></i></button>
+                                    <button onClick={handleDownloadPDF} disabled={isExporting} className="bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-gray-800 transition shadow-md whitespace-nowrap">{isExporting ? <i className="ph ph-spinner animate-spin"></i> : <i className="ph ph-file-pdf"></i>} <span>PDF</span></button>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2 hide-print overflow-x-auto pb-1 no-scrollbar">
+                                <div ref={scrollRef} className="flex gap-1 bg-gray-100 p-1.5 rounded-xl border border-gray-200">
+                                    {scenarioIds.map(id => (
+                                        <div key={id} className="relative group shrink-0">
+                                            {editingTab === id ? <input autoFocus type="text" value={editNameValue} onChange={(e) => setEditNameValue(e.target.value)} onBlur={saveEditName} onKeyDown={(e) => e.key === 'Enter' && saveEditName()} className="w-28 px-3 py-1.5 text-sm border-2 border-indigo-500 rounded-lg outline-none shadow-sm" /> : <button onClick={() => setActiveTab(id)} onDoubleClick={() => { setEditingTab(id); setEditNameValue(scenarioMeta[id]?.name); }} className={`px-4 py-1.5 text-sm font-bold rounded-lg transition flex items-center gap-2 border ${activeTab === id ? 'bg-white text-indigo-600 border-gray-200 shadow-sm' : 'text-gray-500 border-transparent hover:bg-gray-200/50'}`}><span className={`w-2 h-2 rounded-full ${activeTab === id ? 'bg-indigo-500' : 'bg-gray-300'}`}></span>{scenarioMeta[id]?.name}</button>}
+                                            {scenarioIds.length > 1 && !editingTab && <button onClick={(e) => {e.stopPropagation(); deleteScenario(id)}} className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-gray-400 text-white rounded-full flex items-center justify-center text-[10px] shadow-sm transition-all z-10 hover:bg-red-500 hover:scale-110 bg-gray-200" title="ลบ Module นี้"><i className="ph-bold ph-x"></i></button>}
+                                        </div>
+                                    ))}
+                                    <button onClick={addScenario} className="px-3 bg-white text-gray-400 hover:text-green-600 rounded-lg border border-transparent hover:border-green-200 transition"><i className="ph-bold ph-plus"></i></button>
+                                </div>
+                                <button onClick={() => setActiveTab('compare')} className={`px-5 py-2 text-sm font-bold rounded-xl flex items-center gap-2 ml-auto transition shadow-sm ${activeTab === 'compare' ? 'bg-purple-600 text-white shadow-purple-200' : 'bg-white text-purple-700 hover:bg-purple-50 border border-purple-100'}`}><i className="ph ph-chart-bar"></i> Compare</button>
+                            </div>
+                        </div>
+                    </header>
+
+                    <main className="max-w-6xl mx-auto px-4 py-6 space-y-6">
+                        {activeTab !== 'compare' ? (
+                            <>
+                                <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+                                    <div className="md:col-span-8 bg-white p-6 rounded-2xl shadow-sm border border-gray-200 flex flex-col md:flex-row items-center gap-6 hide-print relative overflow-hidden">
+                                        <div className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-br from-indigo-50 to-blue-50 rounded-full -mr-16 -mt-16 opacity-70 pointer-events-none"></div>
+                                        <div onClick={() => coverInputRef.current?.click()} className="w-24 h-24 rounded-2xl bg-gray-50 border-2 border-dashed border-gray-300 flex-shrink-0 flex items-center justify-center cursor-pointer hover:border-indigo-300 hover:bg-indigo-50 relative bg-cover bg-center shadow-inner transition-all group" style={{backgroundImage: scenarioMeta[activeTab]?.coverImage ? `url(${scenarioMeta[activeTab].coverImage})` : 'none'}}>{!scenarioMeta[activeTab]?.coverImage && <i className="ph-duotone ph-image text-3xl text-gray-300 group-hover:text-indigo-400 transition"></i>}<input type="file" ref={coverInputRef} className="hidden" accept="image/*" onChange={handleCoverImageUpload} /></div>
+                                        <div className="flex-1 text-center md:text-left z-10 w-full">
+                                            <h2 className="text-2xl font-bold text-gray-800 mb-1">{scenarioMeta[activeTab]?.name}</h2>
+                                            <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 text-sm mt-2">
+                                                <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-200"><span className="text-gray-500 font-medium">พื้นที่ (ตร.ม.):</span><input type="number" value={scenarioMeta[activeTab]?.area || 0} onChange={(e) => handleMetaChange(activeTab, 'area', e.target.value)} className="w-16 bg-transparent text-right font-bold text-gray-800 outline-none" /></div>
+                                                <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-200"><span className="text-gray-500 font-medium">กำไร (%):</span><input type="number" value={scenarioMeta[activeTab]?.markup || 0} onChange={(e) => handleMetaChange(activeTab, 'markup', e.target.value)} className="w-12 bg-transparent text-right font-bold text-green-600 outline-none" /></div>
+                                            </div>
+                                            <CostDistributionBar data={chartData} total={currentDirectTotal} />
+                                        </div>
+                                    </div>
+                                    <div className="md:col-span-4 flex flex-col gap-4">
+                                        <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-200 flex-1 flex items-center justify-center hide-print relative min-h-[160px]">
+                                            <DonutChart data={chartData} total={currentDirectTotal} />
+                                            {currentDirectTotal === 0 && <div className="text-center text-gray-400 text-xs absolute">Waiting for data...</div>}
+                                        </div>
+                                        {scenarioIds.length > 1 && <ComparisonCard currentTotal={currentGrandTotal} compareTotal={compareTotal} currentName={scenarioMeta[activeTab]?.name} compareName={compareName} />}
+                                    </div>
+                                </div>
+
+                                <section className="hide-print bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden ring-1 ring-black/5 relative">
+                                    <div className="p-5 bg-gradient-to-r from-gray-900 to-gray-800 text-white flex justify-between items-center">
+                                        <div><h3 className="font-bold text-lg flex items-center gap-2"><i className="ph-fill ph-list-numbers text-indigo-400"></i> กรอกราคาสรุป (Lump Sum)</h3><p className="text-gray-400 text-xs mt-0.5">กรอกราคารวมของแต่ละหมวดได้เลย</p></div>
+                                        <div className="text-right"><div className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Live Preview</div><div className="text-2xl font-bold text-indigo-300 font-mono">{formatMoney(liveBulkTotal)}</div></div>
+                                    </div>
+                                    <div className="p-0 overflow-visible">
+                                        <table className="w-full text-sm min-w-[600px]">
+                                            <thead><tr className="bg-gray-50 text-gray-500 border-b border-gray-200 text-xs uppercase tracking-wider"><th className="py-3 px-4 text-left font-semibold w-1/2">หมวดหมู่</th><th className="py-3 px-4 text-right font-semibold w-1/2">ราคารวม (บาท)</th><th className="w-10"></th></tr></thead>
+                                            <tbody className="divide-y divide-gray-100">
+                                                {bulkItems.map((item, idx) => {
+                                                    const catInfo = categories.find(c => c.id === item.categoryId);
+                                                    return (
+                                                        <tr key={idx} className="hover:bg-indigo-50/40 transition group relative">
+                                                            <td className="py-3 px-4 font-medium text-gray-700"><div className="flex items-center gap-3"><button onClick={() => handleDeleteCategory(item.categoryId)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition"><i className="ph-bold ph-trash"></i></button><div className={`w-1.5 h-6 rounded-full ${catInfo ? catInfo.color.split(' ')[0] : 'bg-gray-300'}`}></div><input type="text" value={catInfo ? catInfo.name : ''} onChange={(e) => handleCategoryNameChange(item.categoryId, e.target.value)} className="w-full bg-transparent border-b border-transparent focus:border-indigo-500 outline-none font-bold text-gray-700" /></div></td>
+                                                            <td className="py-2 px-4"><input type="number" value={item.total} onChange={(e) => handleBulkChange(idx, e.target.value)} className="w-full p-2.5 border border-gray-200 rounded-lg text-right focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition bg-white font-mono text-lg font-bold text-gray-800 placeholder-gray-300" placeholder="0" /></td>
+                                                            <td className="text-center pr-2">{(parseFloat(item.total) > 0) && <button onClick={() => resetRow(idx)} className="text-gray-300 hover:text-red-500 p-1.5 rounded-md hover:bg-red-50 transition"><i className="ph-bold ph-x"></i></button>}</td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <div className="px-5 py-4 bg-gray-50 border-t border-gray-200 flex justify-between items-center">
+                                        <button onClick={handleAddCategory} className="text-indigo-600 hover:text-indigo-800 text-sm font-bold flex items-center gap-2"><i className="ph-bold ph-plus-circle text-lg"></i> เพิ่มหมวดหมู่</button>
+                                        <button onClick={saveBulkItems} className="bg-indigo-600 text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-indigo-200 hover:bg-indigo-700 hover:shadow-xl hover:-translate-y-0.5 transition flex items-center gap-2"><i className="ph-bold ph-floppy-disk text-lg"></i> บันทึกข้อมูล</button>
+                                    </div>
+                                </section>
+
+                                <div className="grid grid-cols-1 gap-3">
+                                    <h3 className="font-bold text-gray-500 text-xs uppercase tracking-wider ml-1 mt-4">รายการที่บันทึกแล้ว</h3>
+                                    {categories.map(cat => {
+                                        const total = getCategoryTotal(activeTab, cat.id);
+                                        if (total <= 0) return null;
+                                        const percent = currentDirectTotal > 0 ? (total / currentDirectTotal * 100).toFixed(1) : 0;
+                                        return (
+                                            <div key={cat.id} className="bg-white rounded-xl border border-gray-200 p-4 flex items-center justify-between page-break shadow-sm hover:shadow-md transition hover:border-indigo-200 group">
+                                                <div className="flex items-center gap-4"><div className={`w-12 h-12 flex items-center justify-center rounded-xl ${cat.color || 'bg-gray-100 text-gray-600'} bg-opacity-10 group-hover:bg-opacity-20 transition flex-shrink-0`}><i className={`${cat.icon || 'ph-hash'} ph-duotone text-2xl`}></i></div><div className="font-bold text-gray-800 text-lg">{cat.name}</div></div>
+                                                <div className="flex items-center gap-6"><div className="text-right"><div className="font-bold text-indigo-900 text-xl font-mono">{formatMoney(total)}</div><div className="text-xs text-gray-400 font-medium">{percent}% ของทุน</div></div><button onClick={() => removeItem(cat.id)} className="w-9 h-9 flex items-center justify-center text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-full transition hide-print"><i className="ph-bold ph-trash text-lg"></i></button></div>
+                                            </div>
+                                        )
+                                    })}
+                                    {currentDirectTotal === 0 && <div className="text-center py-12 text-gray-400 bg-white rounded-xl border-2 border-dashed">ยังไม่มีข้อมูล</div>}
+                                </div>
+                            </>
+                        ) : (
+                            <div className="bg-white rounded-2xl shadow-lg border border-purple-100 overflow-hidden ring-1 ring-black/5">
+                                <div className="p-6 border-b border-purple-100 bg-gradient-to-r from-purple-50 via-white to-white"><h2 className="text-xl font-bold text-purple-900 flex items-center gap-2"><i className="ph-duotone ph-chart-polar text-2xl"></i> ตารางเปรียบเทียบต้นทุนและวัสดุ</h2><p className="text-sm text-purple-400 ml-8">วิเคราะห์ความแตกต่างด้านราคา (Cost Analysis)</p></div>
+                                <div className="p-6 border-b border-gray-100 bg-gray-50/30"><PyramidChart scenarios={scenarios} scenarioIds={scenarioIds} scenarioMeta={scenarioMeta} categories={categories} /></div>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm">
+                                        <thead><tr className="bg-gray-50 text-gray-600 border-b"><th className="py-4 px-6 text-left w-1/3 font-semibold uppercase text-xs tracking-wider">รายการ</th>{scenarioIds.map(id => (<th key={id} className="py-4 px-4 text-right w-1/3 bg-white align-top border-l border-gray-100"><div className="flex flex-col items-end">{scenarioMeta[id]?.coverImage && <div className="w-full h-32 bg-cover bg-center rounded-xl border shadow-sm mb-3" style={{backgroundImage: `url(${scenarioMeta[id].coverImage})`}}></div>}<div className="font-bold text-lg text-gray-800">{scenarioMeta[id]?.name}</div><div className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded mt-1 font-medium">พื้นที่ {scenarioMeta[id]?.area} ตร.ม.</div></div></th>))}</tr></thead>
+                                        <tbody className="divide-y divide-gray-100">
+                                            {categories.map(cat => {
+                                                const totals = scenarioIds.map(id => getCategoryTotal(id, cat.id));
+                                                const validTotals = totals.filter(t => t > 0);
+                                                const minVal = validTotals.length > 1 ? Math.min(...validTotals) : -1;
+                                                return (
+                                                    <tr key={cat.id} className="hover:bg-purple-50/10 transition">
+                                                        <td className="py-4 px-6 font-medium text-gray-700 align-top"><div className="flex items-center gap-3"><div className={`p-1.5 rounded ${cat.color || 'bg-gray-100 text-gray-600'} bg-opacity-20`}><i className={`${cat.icon || 'ph-hash'} ph-fill`}></i></div>{cat.name}</div></td>
+                                                        {scenarioIds.map((id, idx) => {
+                                                            const val = totals[idx];
+                                                            const area = scenarioMeta[id]?.area || 1;
+                                                            const isWinner = val > 0 && val === minVal;
+                                                            return (
+                                                                <td key={id} className={`py-4 px-4 text-right border-l border-gray-50 align-top ${isWinner ? 'bg-green-50/50' : ''}`}>
+                                                                    <div className={`font-bold text-lg font-mono ${val > 0 ? (isWinner ? 'text-green-700' : 'text-gray-800') : 'text-gray-300'}`}>{val > 0 ? formatMoney(val) : '-'} {isWinner && <i className="ph-fill ph-check-circle text-green-500 ml-2"></i>}</div>
+                                                                    {val > 0 && <div className="text-xs text-gray-400 mt-1">{formatNumber(val/area)} / ตร.ม.</div>}
+                                                                </td>
+                                                            );
+                                                        })}
+                                                    </tr>
+                                                )
+                                            })}
+                                            <tr className="bg-gray-50"><td className="py-3 px-6 font-bold text-gray-600">ต้นทุนรวม (Direct Cost)</td>{scenarioIds.map(id => (<td key={id} className="py-3 px-4 text-right border-l border-gray-200 font-bold text-gray-600">{formatMoney(getDirectTotal(id))}</td>))}</tr>
+                                            <tr className="bg-gray-50"><td className="py-3 px-6 text-gray-500">บวกกำไร/ดำเนินการ</td>{scenarioIds.map(id => { const direct = getDirectTotal(id); const markupVal = direct * ((scenarioMeta[id]?.markup || 0) / 100); return (<td key={id} className="py-3 px-4 text-right border-l border-gray-200 text-sm text-gray-500">+ {formatMoney(markupVal)} ({scenarioMeta[id]?.markup}%)</td>) })}</tr>
+                                            <tr className="bg-gray-100 border-t-2 border-gray-300"><td className="py-5 px-6 font-bold text-gray-900 uppercase text-sm">ราคาสุทธิ (Grand Total)</td>{scenarioIds.map(id => (<td key={id} className="py-5 px-4 text-right border-l border-gray-200"><div className="text-2xl font-bold text-indigo-700 font-mono">{formatMoney(getGrandTotal(id))}</div><div className="text-sm text-gray-500 font-medium mt-1">เฉลี่ย {formatMoney(getGrandTotal(id)/(scenarioMeta[id]?.area||1))} / ตร.ม.</div></td>))}</tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
+                    </main>
+
+                    {activeTab !== 'compare' && (
+                        <div className="fixed-footer fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-xl border-t border-gray-200 p-4 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)] flex justify-between items-center max-w-6xl mx-auto md:rounded-t-2xl print:shadow-none z-30 transition-all">
+                            <div className="flex flex-col"><span className="text-[10px] text-gray-400 uppercase font-bold tracking-widest">งบประมาณรวม (Total Budget)</span><div className="flex items-center gap-2"><span className="text-gray-700 font-semibold text-sm truncate max-w-[150px]">{scenarioMeta[activeTab]?.name}</span>{(scenarioMeta[activeTab]?.markup || 0) > 0 && <span className="text-[10px] bg-green-100 text-green-700 px-1.5 rounded">+{scenarioMeta[activeTab]?.markup}%</span>}</div></div>
+                            <div className="flex flex-col items-end"><span className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-blue-500 font-mono">{formatMoney(currentGrandTotal)}</span><span className="text-xs text-gray-400 font-medium">{formatMoney(currentGrandTotal/(scenarioMeta[activeTab]?.area || 1))} / ตร.ม.</span></div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
 </html>
