@@ -3,703 +3,470 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Project Cost Comparator Pro V9.4</title>
-    
-    <!-- React & ReactDOM -->
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    
-    <!-- Babel for JSX -->
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <title>เปรียบเทียบห้องน้ำตามฟังก์ชัน (S, S1, S2, T, U)</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- Phosphor Icons -->
-    <script src="https://unpkg.com/@phosphor-icons/web"></script>
-
-    <!-- html2pdf.js -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-
-    <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-    <!-- Google Fonts -->
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-
+    
     <style>
-        body, .font-sans, .font-mono { font-family: 'IBM Plex Sans Thai', sans-serif !important; }
-        body { background-color: #f8fafc; }
-        .hide-print { display: block; }
-        @media print {
-            .hide-print { display: none !important; }
-            .page-break { page-break-inside: avoid; }
-            body { background-color: white; }
-            .fixed-footer { position: relative !important; margin-top: 2rem; border-top: 2px solid #333 !important; }
+        body {
+            font-family: 'IBM Plex Sans Thai', sans-serif;
+            background-color: #f8fafc;
         }
-        .generating-pdf .hide-print { display: none !important; }
-        .generating-pdf .fixed-footer { position: relative !important; margin-top: 20px; background: white !important; }
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: #f1f1f1; }
-        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
-        .fade-in { animation: fadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
-        .slide-up { animation: slideUp 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         
-        .range-slider { -webkit-appearance: none; width: 100%; height: 6px; border-radius: 5px; background: #e2e8f0; outline: none; }
-        .range-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 18px; height: 18px; border-radius: 50%; background: #10b981; cursor: pointer; transition: background .15s ease-in-out; }
-        .range-slider::-webkit-slider-thumb:hover { background: #059669; }
-        
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
+
+        /* Blueprint Pattern */
+        .bg-blueprint {
+            background-color: #2c3e50;
+            background-image: linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
     </style>
 </head>
-<body>
-    <div id="root"></div>
+<body class="min-h-screen text-gray-800 p-4 md:p-8">
 
-    <script type="text/babel">
-        const { useState, useEffect, useMemo, useRef } = React;
+    <div class="max-w-7xl mx-auto">
+        <!-- Header -->
+        <header class="mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div class="text-left w-full md:w-auto">
+                <h1 class="text-2xl md:text-3xl font-bold text-slate-800 mb-1 flex items-center gap-2">
+                    <span class="text-indigo-600">Model</span> Comparison
+                </h1>
+                <p class="text-slate-500 text-sm">เปรียบเทียบฟังก์ชันห้องน้ำตามรหัส (S, S1, S2, T, U)</p>
+            </div>
+            
+            <div class="flex flex-col md:flex-row gap-3 w-full md:w-auto items-end">
+                <!-- Series Selector -->
+                <div class="relative w-full md:w-64">
+                    <label class="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Select Size Series (เลือกขนาด)</label>
+                    <select id="series-selector" onchange="changeSeries()" class="block w-full rounded-xl border-0 py-2.5 pl-3 pr-10 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-indigo-600 sm:text-sm shadow-sm font-semibold cursor-pointer hover:bg-gray-50 transition-colors">
+                        <!-- Options injected via JS -->
+                    </select>
+                </div>
+                <!-- View Toggle -->
+                <div class="bg-white/80 p-1 rounded-xl border border-slate-200 shadow-sm flex relative w-full md:w-auto">
+                    <button onclick="switchView('detail')" id="btn-detail" class="flex-1 md:flex-none px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center justify-center gap-2 text-indigo-700 bg-indigo-50 shadow-sm">Detail</button>
+                    <button onclick="switchView('dashboard')" id="btn-dashboard" class="flex-1 md:flex-none px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center justify-center gap-2 text-gray-500 hover:text-gray-700">Analytics</button>
+                </div>
+            </div>
+        </header>
 
-        const INITIAL_CATEGORIES_DEFAULT = [
-            { id: 'cat_01', name: '1. ค่าจ้างทีมงาน (HR/Personnel)', icon: 'ph-users', color: 'bg-blue-100 text-blue-700' },
-            { id: 'cat_02', name: '2. ค่าพัฒนา/ผลิต (Dev/Production)', icon: 'ph-code', color: 'bg-indigo-100 text-indigo-700' },
-            { id: 'cat_03', name: '3. การตลาด (Marketing/Ads)', icon: 'ph-megaphone', color: 'bg-orange-100 text-orange-700' },
-            { id: 'cat_04', name: '4. โครงสร้างพื้นฐาน (Server/Cloud)', icon: 'ph-cloud', color: 'bg-sky-100 text-sky-700' },
-            { id: 'cat_05', name: '5. ซอฟต์แวร์/ไลเซนส์ (Tools)', icon: 'ph-desktop', color: 'bg-cyan-100 text-cyan-700' },
-            { id: 'cat_06', name: '6. จ้างภายนอก (Outsource)', icon: 'ph-handshake', color: 'bg-emerald-100 text-emerald-700' },
-            { id: 'cat_07', name: '7. ค่าบริหารจัดการ (Admin/Ops)', icon: 'ph-files', color: 'bg-slate-200 text-slate-700' },
-            { id: 'cat_08', name: '8. กฎหมาย/บัญชี (Legal/Acct)', icon: 'ph-scales', color: 'bg-yellow-100 text-yellow-700' },
-            { id: 'cat_09', name: '9. การเดินทาง/ที่พัก (Travel)', icon: 'ph-airplane', color: 'bg-purple-100 text-purple-700' },
-            { id: 'cat_10', name: '10. สำรองฉุกเฉิน (Contingency)', icon: 'ph-shield-check', color: 'bg-rose-100 text-rose-700' },
+        <!-- Main Navigation (Types S, S1, S2, T, U) -->
+        <div id="nav-wrapper" class="sticky top-0 z-30 bg-[#f8fafc]/90 backdrop-blur-md py-2 mb-6 -mx-4 px-4 md:static md:bg-transparent md:p-0 md:m-0 transition-all duration-300">
+            <div id="nav-container" class="flex md:grid md:grid-cols-5 gap-3 overflow-x-auto hide-scrollbar pb-2 md:pb-0 snap-x">
+                <!-- Nav Items injected here -->
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="grid lg:grid-cols-12 gap-6 items-start">
+            <div id="main-content-col" class="lg:col-span-8 xl:col-span-9 transition-all">
+                
+                <!-- Inner Tabs -->
+                <div id="inner-tabs" class="flex gap-2 mb-4 overflow-x-auto pb-1 hide-scrollbar">
+                    <button onclick="setTab('specs')" id="tab-specs" class="px-4 py-2 rounded-full text-sm font-bold bg-indigo-600 text-white shadow-md transition-all flex items-center gap-2 whitespace-nowrap">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2z"></path></svg>
+                        ข้อมูลสเปค
+                    </button>
+                    <button onclick="setTab('plan')" id="tab-plan" class="px-4 py-2 rounded-full text-sm font-bold bg-white text-gray-600 hover:bg-gray-100 transition-all flex items-center gap-2 whitespace-nowrap">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>
+                        แปลนพื้น (Plan)
+                    </button>
+                    <button onclick="setTab('3d')" id="tab-3d" class="px-4 py-2 rounded-full text-sm font-bold bg-white text-gray-600 hover:bg-gray-100 transition-all flex items-center gap-2 whitespace-nowrap">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 6-7 6-7-6 7-6zm0 14l7-6v6l-7 6-7-6v-6l7 6z"></path></svg>
+                        3D จำลอง
+                    </button>
+                </div>
+
+                <div id="content-area" class="min-h-[600px] rounded-3xl transition-all duration-500 relative overflow-hidden">
+                    <!-- Content injected via JS -->
+                </div>
+            </div>
+
+            <!-- Sidebar -->
+            <div id="sidebar-col" class="lg:col-span-4 xl:col-span-3 space-y-4 sticky top-24 transition-all">
+                
+                <!-- Model Info Box -->
+                <div class="bg-indigo-900 rounded-2xl shadow-lg border border-indigo-800 p-5 text-white relative overflow-hidden group">
+                    <div class="absolute top-0 right-0 w-24 h-24 bg-indigo-800 rounded-bl-full opacity-50 -mr-4 -mt-4 transition-transform group-hover:scale-110"></div>
+                    <h3 class="font-bold text-indigo-200 mb-1 text-xs uppercase tracking-wider">Current Selection</h3>
+                    <div class="text-3xl font-bold mb-1 flex items-baseline gap-2">
+                        <span id="sidebar-model-code">1822S</span>
+                    </div>
+                    <div class="text-sm text-indigo-100 mb-4 flex items-center gap-2">
+                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
+                        <span id="sidebar-model-size">1.8 x 2.2 m</span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 text-xs border-t border-indigo-700/50 pt-3">
+                         <div><span class="block text-indigo-400">Function</span><span class="font-semibold" id="sidebar-function">Shower</span></div>
+                         <div><span class="block text-indigo-400">Layout</span><span class="font-semibold" id="sidebar-desc">Standard</span></div>
+                    </div>
+                </div>
+
+                <!-- Variant List -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
+                    <h3 class="font-bold text-slate-700 mb-4 flex items-center gap-2 pb-2 border-b border-slate-100">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-indigo-500"><list></list><path d="M3 6h18"/><path d="M3 12h18"/><path d="M3 18h18"/></svg>
+                        เปรียบเทียบรหัส (Variants)
+                    </h3>
+                    <div id="sidebar-list" class="space-y-2"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- DATA ---
+        
+        // Base Series (Sizes)
+        const seriesCatalog = [
+            { id: "1822", w: 1.8, l: 2.2, label: "Series 1822 (1.8x2.2m)" },
+            { id: "1827", w: 1.8, l: 2.7, label: "Series 1827 (1.8x2.7m)" },
+            { id: "2222", w: 2.2, l: 2.2, label: "Series 2222 (2.2x2.2m)" },
+            { id: "2227", w: 2.2, l: 2.7, label: "Series 2227 (2.2x2.7m)" },
+            { id: "2231", w: 2.2, l: 3.1, label: "Series 2231 (2.2x3.1m)" },
+            { id: "2236", w: 2.2, l: 3.6, label: "Series 2236 (2.2x3.6m)" },
+            { id: "2245", w: 2.2, l: 4.5, label: "Series 2245 (2.2x4.5m)" }
         ];
 
-        const formatMoney = (amount) => new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB', maximumFractionDigits: 0 }).format(amount);
-        const formatNumber = (num) => new Intl.NumberFormat('th-TH', { maximumFractionDigits: 2 }).format(num);
+        // Variants (S, S1, S2, T, U) - Replacing "Styles"
+        const variants = [
+            {
+                id: "S", name: "Type S", thaiName: "S (Standard)", slogan: "ห้องน้ำมาตรฐาน (Wet+Dry)",
+                basePricePerSqm: 8500, // Standard price
+                specs: { floor: "กระเบื้อง 12x12 PM", wall: "กระเบื้อง 12x12 + Mosaic", sanitary: "Standard Set", features: "Shower Zone" },
+                pros: ["มีโซนอาบน้ำครบครัน", "Layout มาตรฐาน ใช้งานง่าย"], cons: ["ขนาดตามมาตรฐาน"],
+                bgGradient: "bg-gradient-to-br from-blue-50 to-blue-100", barColor: "bg-blue-500", badge: "Standard",
+                type: "Shower"
+            },
+            {
+                id: "S1", name: "Type S1", thaiName: "S1 (Layout 1)", slogan: "จัดวางแบบทางเลือก 1",
+                basePricePerSqm: 8800, // Slightly more for custom layout
+                specs: { floor: "กระเบื้อง 12x12 PM", wall: "กระเบื้อง 8x10", sanitary: "Adjusted Set", features: "Shower Zone (Alt)" },
+                pros: ["ปรับตำแหน่งสุขภัณฑ์", "เหมาะกับทิศทางประตูเฉพาะ"], cons: ["ราคาอาจสูงกว่า S เล็กน้อย"],
+                bgGradient: "bg-gradient-to-br from-cyan-50 to-cyan-100", barColor: "bg-cyan-500", badge: "Alt Layout",
+                type: "Shower"
+            },
+            {
+                id: "S2", name: "Type S2", thaiName: "S2 (Layout 2)", slogan: "จัดวางแบบทางเลือก 2",
+                basePricePerSqm: 9000,
+                specs: { floor: "Granito / Tile", wall: "Full Height Tile", sanitary: "Special Set", features: "Shower Zone (Alt 2)" },
+                pros: ["การจัดวางพิเศษ", "รองรับเคาน์เตอร์กว้าง"], cons: ["ต้องเช็คระยะท่อ"],
+                bgGradient: "bg-gradient-to-br from-indigo-50 to-indigo-100", barColor: "bg-indigo-500", badge: "Special",
+                type: "Shower"
+            },
+            {
+                id: "T", name: "Type T", thaiName: "T (Toilet)", slogan: "ห้องส้วม (ไม่มีอาบน้ำ)",
+                basePricePerSqm: 6500, // Cheaper
+                specs: { floor: "กระเบื้อง 12x12", wall: "ทาสี / กระเบื้องบางส่วน", sanitary: "Toilet + Basin", features: "No Shower" },
+                pros: ["ประหยัดงบที่สุด", "เหมาะสำหรับรับแขก"], cons: ["อาบน้ำไม่ได้"],
+                bgGradient: "bg-gradient-to-br from-amber-50 to-orange-100", barColor: "bg-amber-500", badge: "Toilet Only",
+                type: "Toilet"
+            },
+            {
+                id: "U", name: "Type U", thaiName: "U (Urinal)", slogan: "ห้องน้ำชาย / แห้ง",
+                basePricePerSqm: 7500,
+                specs: { floor: "กระเบื้อง 12x12", wall: "Wallpaper / Tile", sanitary: "Urinal + Toilet", features: "Dry Function" },
+                pros: ["เพิ่มโถปัสสาวะชาย", "แยกโซนชัดเจน"], cons: ["เน้นการใช้งานเฉพาะ"],
+                bgGradient: "bg-gradient-to-br from-emerald-50 to-teal-100", barColor: "bg-emerald-500", badge: "Urinal/Dry",
+                type: "Dry"
+            }
+        ];
 
-        const ThaiBahtText = (num) => {
-            if (!num) return "";
-            num = Math.floor(num);
-            const t = ["", "หนึ่ง", "สอง", "สาม", "สี่", "ห้า", "หก", "เจ็ด", "แปด", "เก้า"];
-            const u = ["", "สิบ", "ร้อย", "พัน", "หมื่น", "แสน", "ล้าน"];
-            let s = num.toString();
-            let k = "";
-            if (s.length > 13) return "จำนวนเงินสูงเกินไป"; 
-            return `(${new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' }).format(num)})`; 
+        // State
+        let selectedSeriesId = "1822";
+        let selectedVariantIndex = 0; // Default to S (Index 0)
+        let viewMode = 'detail';
+        let activeTab = 'specs';
+
+        // Icons map
+        const icons = {
+            check: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="stroke-[3]"><polyline points="20 6 9 17 4 12"></polyline></svg>`,
+            x: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="stroke-[3]"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`,
+            star: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>`,
+            dollar: `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>`,
+            hammer: `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>`
+        };
+
+        function init() {
+            const select = document.getElementById('series-selector');
+            select.innerHTML = seriesCatalog.map(s => `<option value="${s.id}" ${s.id === selectedSeriesId ? 'selected' : ''}>${s.label}</option>`).join('');
+            render();
+            updateSidebar();
         }
 
-        const Toast = ({ message, onClose }) => {
-            useEffect(() => { const timer = setTimeout(onClose, 2000); return () => clearTimeout(timer); }, [onClose]);
-            return (
-                <div className="fixed top-4 right-4 z-[999] bg-gray-900 text-white px-6 py-3 rounded-lg shadow-xl flex items-center gap-3 slide-up border border-gray-700">
-                    <i className="ph-fill ph-check-circle text-emerald-400 text-xl"></i>
-                    <span className="font-medium text-sm">{message}</span>
-                </div>
-            );
-        };
+        function changeSeries() {
+            selectedSeriesId = document.getElementById('series-selector').value;
+            render();
+            updateSidebar();
+        }
 
-        const KPICards = ({ total, duration, items }) => {
-            const getSum = (ids) => items.filter(i => ids.includes(i.categoryId)).reduce((sum, i) => sum + (parseFloat(i.total) || 0), 0);
-            const peopleCost = getSum(['cat_01', 'cat_06']);
-            const opsToolsCost = getSum(['cat_02', 'cat_04', 'cat_05']);
-            const overheadCost = getSum(['cat_07', 'cat_08', 'cat_09', 'cat_10']);
-            const burnRate = duration > 0 ? total / duration : 0;
-            const overheadRatio = total > 0 ? (overheadCost / total) * 100 : 0;
-            const ovhColor = overheadRatio > 25 ? 'text-red-500' : overheadRatio > 15 ? 'text-amber-500' : 'text-emerald-600';
-            const ovhBg = overheadRatio > 25 ? 'bg-red-50' : overheadRatio > 15 ? 'bg-amber-50' : 'bg-emerald-50';
+        function setVariant(index) {
+            selectedVariantIndex = index;
+            render();
+            updateSidebar();
+        }
 
-            return (
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6 hide-print fade-in">
-                    <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col hover:shadow-md transition">
-                        <div className="flex items-center gap-2 text-gray-400 mb-2"><div className="p-1.5 rounded-lg bg-orange-50 text-orange-500"><i className="ph-bold ph-fire"></i></div><span className="text-[10px] lg:text-xs font-bold uppercase tracking-wide">Burn Rate</span></div>
-                        <div className="text-xl lg:text-2xl font-bold text-gray-800 tracking-tight">{formatNumber(burnRate)}</div><div className="text-[10px] text-gray-400 mt-1">บาท / เดือน (Avg.)</div>
-                    </div>
-                    <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col hover:shadow-md transition">
-                        <div className="flex items-center gap-2 text-gray-400 mb-2"><div className="p-1.5 rounded-lg bg-blue-50 text-blue-500"><i className="ph-bold ph-users-three"></i></div><span className="text-[10px] lg:text-xs font-bold uppercase tracking-wide">People Cost</span></div>
-                        <div className="text-xl lg:text-2xl font-bold text-blue-600 tracking-tight">{formatNumber(peopleCost)}</div><div className="text-[10px] text-gray-400 mt-1">ทีมงาน & Outsource</div>
-                    </div>
-                    <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col hover:shadow-md transition">
-                        <div className="flex items-center gap-2 text-gray-400 mb-2"><div className="p-1.5 rounded-lg bg-indigo-50 text-indigo-500"><i className="ph-bold ph-gear"></i></div><span className="text-[10px] lg:text-xs font-bold uppercase tracking-wide">Ops & Tools</span></div>
-                        <div className="text-xl lg:text-2xl font-bold text-indigo-600 tracking-tight">{formatNumber(opsToolsCost)}</div><div className="text-[10px] text-gray-400 mt-1">ผลิต & เครื่องมือ</div>
-                    </div>
-                    <div className={`bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col hover:shadow-md transition relative overflow-hidden`}>
-                        <div className="flex items-center gap-2 text-gray-400 mb-2 relative z-10"><div className={`p-1.5 rounded-lg ${ovhBg} ${ovhColor.replace('text', 'bg').replace('500', '100').replace('600', '100')}`}><i className="ph-bold ph-chart-pie-slice"></i></div><span className="text-[10px] lg:text-xs font-bold uppercase tracking-wide">Overhead %</span></div>
-                        <div className={`text-xl lg:text-2xl font-bold ${ovhColor} tracking-tight relative z-10`}>{overheadRatio.toFixed(1)}%</div><div className="text-[10px] text-gray-400 mt-1 relative z-10">ค่าบริหารจัดการ</div>
-                    </div>
-                </div>
-            );
-        };
+        function setTab(tab) {
+            activeTab = tab;
+            render();
+        }
 
-        const DonutChart = ({ data, total }) => {
-            const chartRef = useRef(null);
-            const chartInstance = useRef(null);
-            useEffect(() => {
-                const hasValue = data && data.some(d => d.value > 0);
-                if (!hasValue || total <= 0) {
-                    if (chartInstance.current) chartInstance.current.destroy();
-                    return;
-                }
-                const ctx = chartRef.current.getContext('2d');
-                if (chartInstance.current) chartInstance.current.destroy();
-                chartInstance.current = new Chart(ctx, {
-                    type: 'doughnut',
-                    data: {
-                        labels: data.map(d => d.name),
-                        datasets: [{
-                            data: data.map(d => d.value),
-                            backgroundColor: ['#3b82f6', '#6366f1', '#f97316', '#0ea5e9', '#06b6d4', '#10b981', '#64748b', '#eab308', '#a855f7', '#f43f5e'],
-                            borderWidth: 0,
-                            hoverOffset: 4
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => ` ${ctx.label}: ${formatMoney(ctx.raw)}` }, bodyFont: { family: "'IBM Plex Sans Thai', sans-serif" } } },
-                        cutout: '75%'
-                    }
-                });
-                return () => { if (chartInstance.current) chartInstance.current.destroy(); };
-            }, [data, total]);
-            if (total <= 0) return <div className="h-40 w-40 mx-auto flex items-center justify-center text-gray-300 italic text-xs text-center">กรุณากรอกข้อมูลงบประมาณ</div>;
-            return (
-                <div className="relative h-40 w-40 mx-auto">
-                    <canvas ref={chartRef}></canvas>
-                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                        <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">รวม</span>
-                        <span className="text-xs font-bold text-gray-800">{formatNumber(total/1000000)}M</span>
-                    </div>
-                </div>
-            );
-        };
+        function switchView(mode) {
+            viewMode = mode;
+            render();
+        }
 
-        const ComparisonBarChart = ({ scenarios, scenarioIds, scenarioMeta, categories }) => {
-            const chartRef = useRef(null);
-            const chartInstance = useRef(null);
-            useEffect(() => {
-                if (scenarioIds.length < 1) return;
-                const ctx = chartRef.current.getContext('2d');
-                const datasets = scenarioIds.map((id, index) => {
-                    const colors = ['rgba(59, 130, 246, 0.7)', 'rgba(16, 185, 129, 0.7)', 'rgba(249, 115, 22, 0.7)', 'rgba(168, 85, 247, 0.7)'];
-                    return {
-                        label: scenarioMeta[id]?.name || `Option ${id}`,
-                        data: categories.map(cat => {
-                            const catData = scenarios[id]?.[cat.id];
-                            return Array.isArray(catData) ? catData.reduce((sum, item) => sum + (parseFloat(item.total) || 0), 0) : 0;
-                        }),
-                        backgroundColor: colors[index % colors.length],
-                        borderRadius: 4
-                    };
-                });
-                if (chartInstance.current) chartInstance.current.destroy();
-                chartInstance.current = new Chart(ctx, {
-                    type: 'bar',
-                    data: {
-                        labels: categories.map(c => c.name.split('. ')[1] || c.name),
-                        datasets: datasets
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        scales: { 
-                            x: { ticks: { font: { family: "'IBM Plex Sans Thai', sans-serif", size: 10 } }, grid: { display: false } }, 
-                            y: { grid: { borderDash: [5, 5] }, ticks: { font: { family: "'IBM Plex Sans Thai', sans-serif", size: 10 } } } 
-                        },
-                        plugins: { tooltip: { bodyFont: { family: "'IBM Plex Sans Thai', sans-serif" } }, legend: { position: 'bottom', labels: { font: { family: "'IBM Plex Sans Thai', sans-serif" } } } }
-                    }
-                });
-                return () => { if (chartInstance.current) chartInstance.current.destroy(); };
-            }, [scenarios, scenarioIds, scenarioMeta, categories]);
-            return <div className="h-[350px] w-full p-2"><canvas ref={chartRef}></canvas></div>;
-        };
-
-        const App = () => {
-            const [activeTab, setActiveTab] = useState(1);
-            const [editingTab, setEditingTab] = useState(null);
-            const [editNameValue, setEditNameValue] = useState("");
-            const [toastMessage, setToastMessage] = useState(null);
-            const [projectName, setProjectName] = useState("โครงการพัฒนา Application A");
-            const [isEditingTitle, setIsEditingTitle] = useState(false);
-            const [isExporting, setIsExporting] = useState(false);
-            const [riskFactor, setRiskFactor] = useState(0);
-            const fileInputRef = useRef(null);
-
-            const [categories, setCategories] = useState(() => {
-                const saved = localStorage.getItem('projCostCatsV1');
-                return saved ? JSON.parse(saved) : INITIAL_CATEGORIES_DEFAULT;
-            });
-            const [scenarios, setScenarios] = useState(() => {
-                const saved = localStorage.getItem('projCostDataV1');
-                const def = { 1: {}, 2: {} };
-                INITIAL_CATEGORIES_DEFAULT.forEach(c => { def[1][c.id] = []; def[2][c.id] = []; });
-                return saved ? JSON.parse(saved) : def;
-            });
-            const [scenarioMeta, setScenarioMeta] = useState(() => {
-                const saved = localStorage.getItem('projCostMetaV1');
-                return saved ? JSON.parse(saved) : { 
-                    1: { duration: 6, name: 'Option 1: ทำเอง (In-house)', markup: 0, coverImage: null }, 
-                    2: { duration: 4, name: 'Option 2: จ้างทำ (Outsource)', markup: 0, coverImage: null } 
-                };
-            });
-            const [bulkItems, setBulkItems] = useState([]);
-
-            useEffect(() => {
-                localStorage.setItem('projCostDataV1', JSON.stringify(scenarios));
-                localStorage.setItem('projCostMetaV1', JSON.stringify(scenarioMeta));
-                localStorage.setItem('projCostCatsV1', JSON.stringify(categories));
-            }, [scenarios, scenarioMeta, categories]);
-
-            useEffect(() => {
-                if (activeTab === 'compare') return;
-                const currentData = scenarios[activeTab] || {};
-                const loadedItems = categories.map(cat => {
-                    const existing = currentData[cat.id]?.[0];
-                    return { 
-                        categoryId: cat.id, 
-                        total: existing ? existing.total.toString() : "",
-                        remark: existing ? existing.remark || "" : "" // Add remark field
-                    };
-                });
-                setBulkItems(loadedItems);
-            }, [activeTab, categories, scenarios]);
-
-            const scenarioIds = useMemo(() => Object.keys(scenarios).map(Number).sort((a, b) => a - b), [scenarios]);
-
-            const handleBulkChange = (index, field, value) => {
-                const newItems = [...bulkItems];
-                newItems[index] = { ...newItems[index], [field]: value };
-                setBulkItems(newItems);
-            };
+        function updateSidebar() {
+            const series = seriesCatalog.find(s => s.id === selectedSeriesId);
+            const variant = variants[selectedVariantIndex];
+            const fullCode = `${series.id}${variant.id}`;
             
-            const saveBulkItems = () => {
-                setScenarios(prev => {
-                    const updatedScenario = { ...prev[activeTab] };
-                    bulkItems.forEach(item => {
-                        const val = parseFloat(item.total) || 0;
-                        const catInfo = categories.find(c => c.id === item.categoryId);
-                        if(catInfo) updatedScenario[item.categoryId] = [{ 
-                            id: Date.now() + Math.random(), 
-                            name: catInfo.name, 
-                            total: val,
-                            remark: item.remark 
-                        }];
-                    });
-                    return { ...prev, [activeTab]: updatedScenario };
-                });
-                setToastMessage("บันทึกข้อมูลงบประมาณแล้ว");
-            };
+            document.getElementById('sidebar-model-code').innerText = fullCode;
+            document.getElementById('sidebar-model-size').innerText = `${series.w} x ${series.l} m`;
+            document.getElementById('sidebar-function').innerText = variant.type;
+            document.getElementById('sidebar-desc').innerText = variant.thaiName;
+        }
 
-            const handleMetaChange = (id, field, value) => {
-                setScenarioMeta(prev => ({ ...prev, [id]: { ...prev[id], [field]: (field === 'duration' || field === 'markup') ? (parseFloat(value) || 0) : value } }));
-            };
-            const handleImageUpload = (e) => {
-                const file = e.target.files[0];
-                if (file) {
-                    const reader = new FileReader();
-                    reader.onloadend = () => handleMetaChange(activeTab, 'coverImage', reader.result);
-                    reader.readAsDataURL(file);
-                }
-            };
-            const addScenario = () => {
-                const newId = (Math.max(...scenarioIds) || 0) + 1;
-                setScenarios(prev => ({ ...prev, [newId]: {} })); 
-                setScenarioMeta(prev => ({ ...prev, [newId]: { duration: 6, name: `Option ${newId}`, markup: 0, coverImage: null } }));
-                setActiveTab(newId);
-                setToastMessage("เพิ่มทางเลือกใหม่แล้ว");
-            };
-            const deleteScenario = (id) => {
-                if (scenarioIds.length <= 1) return alert("ต้องมีอย่างน้อย 1 ทางเลือก");
-                if (confirm(`ยืนยันลบ "${scenarioMeta[id]?.name}"?`)) {
-                    const newScenarios = { ...scenarios }; delete newScenarios[id];
-                    const newMeta = { ...scenarioMeta }; delete newMeta[id];
-                    setScenarios(newScenarios);
-                    setScenarioMeta(newMeta);
-                    if (activeTab === id) setActiveTab(Number(Object.keys(newScenarios)[0]) || 1);
-                    setToastMessage("ลบเรียบร้อย");
-                }
-            };
-            const startEditingTab = (id) => { setEditingTab(id); setEditNameValue(scenarioMeta[id].name); };
-            const saveEditName = () => { if (editingTab !== null) { const newName = editNameValue.trim() || `Option ${editingTab}`; handleMetaChange(editingTab, 'name', newName); setEditingTab(null); } };
-            const handleAddCategory = () => {
-                const newId = `cat_${Date.now()}`;
-                const newCat = { id: newId, name: 'หมวดหมู่ใหม่ (แก้ไขได้)', icon: 'ph-circles-four', color: 'bg-gray-100 text-gray-700' };
-                setCategories([...categories, newCat]);
-                setToastMessage("เพิ่มหมวดหมู่ใหม่แล้ว");
-            };
-            const handleDeleteCategory = (catId, catName) => {
-                if (!confirm(`ต้องการลบหมวดหมู่ "${catName}"? ข้อมูลในหมวดนี้จะหายไป`)) return;
-                setCategories(categories.filter(c => c.id !== catId));
-                setToastMessage("ลบหมวดหมู่แล้ว");
-            };
-            const handleCategoryNameChange = (id, newName) => { setCategories(categories.map(c => c.id === id ? { ...c, name: newName } : c)); };
-            const generateTestData = () => {
-                if (!confirm("ต้องการสร้างข้อมูลตัวอย่าง? ข้อมูลปัจจุบันในหน้านี้จะถูกแทนที่")) return;
-                const testData = {};
-                categories.forEach(cat => {
-                    let price = 0;
-                    if (cat.name.includes('ทีมงาน')) price = 250000; else if (cat.name.includes('พัฒนา')) price = 150000; else if (cat.name.includes('ตลาด')) price = 50000; else price = Math.floor(Math.random() * 30000) + 5000;
-                    testData[cat.id] = [{ id: Date.now() + Math.random(), name: cat.name, total: price, remark: 'ประมาณการเบื้องต้น' }];
-                });
-                setScenarios(prev => ({ ...prev, [activeTab]: testData }));
-                setToastMessage("สร้างข้อมูลตัวอย่างแล้ว");
-            };
-            const copyToOtherModule = () => {
-                const targetId = scenarioIds.find(id => id !== activeTab);
-                if (!targetId) return alert("ต้องมี Option อื่นเพื่อคัดลอกไป");
-                if (!confirm(`ต้องการคัดลอกข้อมูลไปยัง "${scenarioMeta[targetId].name}"?`)) return;
-                setScenarios(prev => ({ ...prev, [targetId]: JSON.parse(JSON.stringify(scenarios[activeTab])) }));
-                setToastMessage(`คัดลอกข้อมูลสำเร็จ`);
-            };
-            const clearAll = () => {
-                if(confirm('ล้างข้อมูลใหม่ทั้งหมด?')) {
-                    setScenarios({1:{},2:{}});
-                    setScenarioMeta({ 1: { duration: 6, name: 'Option 1: ทำเอง', markup: 0 }, 2: { duration: 4, name: 'Option 2: จ้างทำ', markup: 0 } });
-                    setActiveTab(1);
-                    setCategories(INITIAL_CATEGORIES_DEFAULT);
-                    setToastMessage("รีเซ็ตโครงการแล้ว");
-                }
-            };
-            const exportData = () => {
-                const data = { version: "V9.4", projectName, scenarios, scenarioMeta, categories };
-                const blob = new Blob([JSON.stringify(data)], {type: "application/json"});
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a'); a.href = url; a.download = `Project_${projectName}_Backup.json`; a.click();
-            };
+        function getCalculatedData() {
+            const series = seriesCatalog.find(s => s.id === selectedSeriesId);
+            const variant = variants[selectedVariantIndex];
+            const area = series.w * series.l;
             
-            // New Feature: Export CSV
-            const exportToCSV = () => {
-                if (activeTab === 'compare') {
-                    // Compare mode CSV
-                    let csv = `Category,${scenarioIds.map(id => scenarioMeta[id].name).join(',')}\n`;
-                    categories.forEach(cat => {
-                        const row = [cat.name];
-                        scenarioIds.forEach(id => {
-                            const val = getCategoryTotal(id, cat.id);
-                            row.push(val);
-                        });
-                        csv += row.join(',') + '\n';
-                    });
-                    csv += `Total,${scenarioIds.map(id => getGrandTotal(id)).join(',')}\n`;
-                    
-                    const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a'); a.href = url; a.download = `Comparison_${projectName}.csv`; a.click();
-                } else {
-                    // Single Scenario CSV
-                    let csv = `Category,Cost,Remark\n`;
-                    bulkItems.forEach((item, idx) => {
-                        const catName = categories[idx].name;
-                        csv += `"${catName}",${item.total},"${item.remark || ''}"\n`;
-                    });
-                    csv += `Direct Cost,${currentDirectTotal},\n`;
-                    csv += `Grand Total (w/ Markup),${currentGrandTotal},\n`;
-
-                    const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a'); a.href = url; a.download = `${scenarioMeta[activeTab].name}_${projectName}.csv`; a.click();
-                }
-                setToastMessage("Export Excel/CSV สำเร็จ");
-            };
-
-            const importData = (e) => {
-                const file = e.target.files[0]; if (!file) return;
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                    try {
-                        const data = JSON.parse(event.target.result);
-                        if (data.scenarios) {
-                            setProjectName(data.projectName || "Project"); setScenarios(data.scenarios); setScenarioMeta(data.scenarioMeta); 
-                            if(data.categories) setCategories(data.categories);
-                            setActiveTab(Number(Object.keys(data.scenarios)[0]) || 1); setToastMessage("นำเข้าข้อมูลสำเร็จ");
-                        }
-                    } catch (err) { alert("ไฟล์ไม่ถูกต้อง"); }
-                };
-                reader.readAsText(file); e.target.value = '';
-            };
-            const getCategoryTotal = (scenId, catId) => {
-                const catData = scenarios[scenId]?.[catId];
-                if (!catData) return 0;
-                return Array.isArray(catData) ? catData.reduce((s, i) => s + (parseFloat(i.total) || 0), 0) : 0;
-            };
-            const getDirectTotal = (scenId) => categories.reduce((s, c) => s + getCategoryTotal(scenId, c.id), 0);
-            const getGrandTotal = (scenId) => {
-                const direct = getDirectTotal(scenId);
-                const markup = scenarioMeta[scenId]?.markup || 0;
-                return direct * (1 + markup / 100); 
-            };
+            // Basic Price Logic
+            let estimatedPrice = Math.round(area * variant.basePricePerSqm);
             
-            const getGrandTotalWithRisk = (scenId) => {
-                const base = getGrandTotal(scenId);
-                return base * (1 + riskFactor/100);
+            // Adjustments
+            if (series.id === '2245' && variant.id.includes('S')) estimatedPrice *= 1.2; // Master bath premium
+
+            const priceLow = Math.floor(estimatedPrice / 1000) * 1000;
+            const priceHigh = priceLow + 5000;
+            
+            return {
+                ...variant,
+                fullCode: `${series.id}${variant.id}`,
+                seriesId: series.id,
+                w: series.w,
+                l: series.l,
+                area: area.toFixed(2),
+                priceRange: `${(priceLow/1000).toFixed(0)}k - ${(priceHigh/1000).toFixed(0)}k`,
+                avgPrice: (priceLow + priceHigh) / 2
+            };
+        }
+
+        function render() {
+            if (viewMode === 'dashboard') {
+                renderDashboard();
+                return;
             }
 
-            const currentDirectTotal = useMemo(() => activeTab === 'compare' ? 0 : getDirectTotal(activeTab), [scenarios, activeTab, categories]);
-            const currentMarkup = scenarioMeta[activeTab]?.markup || 0;
-            const currentGrandTotal = currentDirectTotal * (1 + (currentMarkup + (activeTab !== 'compare' ? riskFactor : 0)) / 100);
-            const chartData = useMemo(() => {
-                if (activeTab === 'compare') return [];
-                return categories.map(cat => ({ name: cat.name.split('. ')[1] || cat.name, value: getCategoryTotal(activeTab, cat.id) })).filter(item => item.value > 0);
-            }, [scenarios, activeTab, categories]);
+            const current = getCalculatedData();
 
-            const handleDownloadPDF = async () => {
-                setIsExporting(true);
-                document.body.classList.add('generating-pdf');
-                await new Promise(r => setTimeout(r, 800));
-                const element = document.getElementById('root');
-                const opt = { margin: 0, filename: `${projectName}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true, letterRendering: true }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' } };
-                html2pdf().set(opt).from(element).save().then(() => { document.body.classList.remove('generating-pdf'); setIsExporting(false); setToastMessage("ดาวน์โหลด PDF แล้ว"); });
-            };
+            // 1. Render Top Nav (Variants)
+            document.getElementById('nav-container').innerHTML = variants.map((v, index) => {
+                const isActive = selectedVariantIndex === index;
+                return `
+                <button onclick="setVariant(${index})" 
+                    class="snap-start min-w-[120px] md:min-w-0 md:flex-1 p-3 rounded-2xl border transition-all duration-300 flex flex-col items-center justify-center gap-1 relative overflow-hidden group
+                    ${isActive 
+                        ? 'bg-white border-indigo-500 shadow-md ring-2 ring-indigo-100 transform -translate-y-1' 
+                        : 'bg-white/60 border-transparent hover:bg-white hover:border-indigo-200 hover:shadow-sm'
+                    }">
+                    <div class="text-xs font-bold uppercase tracking-wider mb-1 px-2 py-0.5 rounded-full
+                        ${isActive ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-500 group-hover:bg-indigo-50'}">
+                        Type ${v.id}
+                    </div>
+                    <div class="text-sm font-bold ${isActive ? 'text-gray-800' : 'text-gray-400'}">
+                        ${v.thaiName.split('(')[1].replace(')','')}
+                    </div>
+                </button>
+                `;
+            }).join('');
 
-            // Comparison Logic
-            const comparisonStats = useMemo(() => {
-                if(scenarioIds.length === 0) return [];
-                const stats = scenarioIds.map(id => ({
-                    id,
-                    total: getGrandTotalWithRisk(id),
-                    meta: scenarioMeta[id]
-                }));
-                const minTotal = Math.min(...stats.map(s => s.total));
-                return stats.map(s => ({
-                    ...s,
-                    isCheapest: s.total === minTotal,
-                    diffPercent: minTotal > 0 ? ((s.total - minTotal) / minTotal) * 100 : 0
-                }));
-            }, [scenarios, scenarioMeta, riskFactor, scenarioIds]);
+            // 2. Render Content Area
+            const detailCard = document.getElementById('content-area');
+            detailCard.className = `min-h-[600px] rounded-3xl p-6 md:p-10 shadow-xl transition-all duration-500 relative overflow-hidden border border-white/50 ${current.bgGradient}`;
 
-            return (
-                <div className="min-h-screen pb-20 bg-gray-50 text-gray-800 font-sans">
-                    {toastMessage && <Toast message={toastMessage} onClose={() => setToastMessage(null)} />}
+            let contentHTML = '';
+            if (activeTab === 'specs') contentHTML = renderSpecs(current);
+            else if (activeTab === 'plan') contentHTML = renderPlan(current);
+            else if (activeTab === '3d') contentHTML = render3D(current);
 
-                    {/* Navbar */}
-                    <header className="bg-white shadow-sm sticky top-0 z-20 print:static print:shadow-none border-b border-gray-200">
-                        <div className="max-w-6xl mx-auto px-4 py-3">
-                            <div className="flex flex-col md:flex-row justify-between items-center gap-3">
-                                <div className="flex items-center gap-3 w-full md:w-auto">
-                                    <div className="bg-emerald-600 text-white p-2.5 rounded-xl shadow-lg"><i className="ph-duotone ph-briefcase text-2xl"></i></div>
-                                    <div className="flex-1">
-                                        {isEditingTitle ? 
-                                            <input autoFocus value={projectName} onChange={(e) => setProjectName(e.target.value)} onBlur={() => setIsEditingTitle(false)} className="text-xl font-bold border-b-2 border-emerald-500 outline-none bg-transparent w-full" /> : 
-                                            <h1 onClick={() => setIsEditingTitle(true)} className="text-xl font-extrabold cursor-pointer hover:text-emerald-600 transition flex items-center gap-2">{projectName} <i className="ph-bold ph-pencil-simple text-xs text-gray-300"></i></h1>
-                                        }
-                                        <p className="text-xs text-gray-500 font-medium">Cost Management System v9.4</p>
-                                    </div>
-                                </div>
-                                
-                                <div className="flex gap-2 hide-print overflow-x-auto pb-1 no-scrollbar w-full md:w-auto">
-                                     <button onClick={exportToCSV} className="p-2 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition shadow-sm" title="Export Excel (CSV)"><i className="ph-bold ph-file-csv text-lg"></i></button>
-                                     <button onClick={exportData} className="p-2 bg-white text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition shadow-sm" title="Backup (JSON)"><i className="ph-bold ph-download-simple text-lg"></i></button>
-                                     <label className="p-2 bg-white text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition shadow-sm cursor-pointer" title="Restore (JSON)"><i className="ph-bold ph-upload-simple text-lg"></i><input type="file" onChange={importData} className="hidden" accept=".json" /></label>
-                                     <div className="w-px h-8 bg-gray-200 mx-1"></div>
-                                     {activeTab !== 'compare' && (
-                                         <>
-                                            <button onClick={generateTestData} className="p-2 bg-amber-50 text-amber-600 border border-amber-200 rounded-lg hover:bg-amber-100 transition shadow-sm" title="Auto Fill"><i className="ph-fill ph-magic-wand text-lg"></i></button>
-                                            <button onClick={copyToOtherModule} className="p-2 bg-blue-50 text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-100 transition shadow-sm" title="Copy to Other Tab"><i className="ph-bold ph-copy text-lg"></i></button>
-                                         </>
-                                     )}
-                                     <button onClick={clearAll} className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition" title="Clear All"><i className="ph-bold ph-trash text-lg"></i></button>
-                                     <div className="w-px h-8 bg-gray-200 mx-1"></div>
-                                     <button onClick={handleDownloadPDF} disabled={isExporting} className="bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-gray-800 transition shadow-md whitespace-nowrap">
-                                        {isExporting ? <i className="ph ph-spinner animate-spin"></i> : <i className="ph ph-file-pdf"></i>} PDF
-                                     </button>
-                                </div>
+            detailCard.innerHTML = contentHTML;
+
+            // 3. Render Sidebar List
+            document.getElementById('sidebar-list').innerHTML = variants.map((v, index) => {
+                const isActive = selectedVariantIndex === index;
+                const activeClass = isActive ? 'bg-indigo-50 border-indigo-200 shadow-inner' : 'bg-white border-transparent hover:bg-slate-50';
+                return `
+                <div onclick="setVariant(${index})" class="p-3 rounded-xl border cursor-pointer transition-all duration-200 flex items-center justify-between ${activeClass}">
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${isActive ? 'bg-indigo-500 text-white' : 'bg-slate-100 text-slate-500'}">${v.id}</div>
+                        <div class="font-bold text-sm text-slate-700">${v.thaiName}</div>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        function renderSpecs(current) {
+            const prosList = current.pros.map(pro => `<li class="flex items-start gap-3 text-sm text-gray-700 bg-white/60 p-2 rounded-lg"><div class="text-green-600 mt-0.5">${icons.check}</div><span>${pro}</span></li>`).join('');
+            
+            return `
+                <div class="animate-fade-in relative z-10">
+                    <div class="flex flex-col md:flex-row justify-between items-start gap-6 mb-8 border-b border-black/5 pb-6">
+                        <div>
+                            <div class="flex items-center gap-3 mb-2">
+                                <span class="bg-indigo-600 text-white px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide shadow-sm">${current.fullCode}</span>
+                                <span class="flex items-center gap-1 text-amber-500 text-xs font-bold bg-white px-2 py-1 rounded-full shadow-sm">${icons.star} ${current.badge}</span>
                             </div>
+                            <h2 class="text-3xl md:text-4xl font-bold text-gray-900 mb-2">${current.thaiName}</h2>
+                            <p class="text-gray-600 italic">"${current.slogan}"</p>
+                        </div>
+                        <div class="bg-white/80 backdrop-blur-md p-4 rounded-2xl shadow-sm border border-white min-w-[200px]">
+                            <div class="flex items-center gap-2 text-green-700 font-bold text-2xl">${icons.dollar} ${current.priceRange}</div>
+                            <div class="text-xs text-gray-500 mt-1">ประเมินพื้นที่ ${current.area} ตร.ม.</div>
+                        </div>
+                    </div>
 
-                            <div className="flex items-center gap-2 mt-4 hide-print overflow-x-auto no-scrollbar pb-2">
-                                {scenarioIds.map(id => (
-                                    <div key={id} className="relative group shrink-0">
-                                        {editingTab === id ? (
-                                             <input autoFocus type="text" value={editNameValue} onChange={(e) => setEditNameValue(e.target.value)} onBlur={saveEditName} onKeyDown={(e) => e.key === 'Enter' && saveEditName()} className="w-32 px-3 py-1.5 text-sm border-2 border-emerald-500 rounded-lg outline-none shadow-sm" />
-                                        ) : (
-                                            <div className="relative">
-                                                <button onClick={() => setActiveTab(id)} onDoubleClick={() => startEditingTab(id)} className={`px-4 py-2 text-sm font-bold rounded-xl whitespace-nowrap transition-all pr-8 ${activeTab === id ? 'bg-emerald-600 text-white shadow-md' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`} title="Double click to rename">{scenarioMeta[id].name}</button>
-                                                {scenarioIds.length > 1 && (<button onClick={(e) => { e.stopPropagation(); deleteScenario(id); }} className={`absolute right-1 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-red-500 hover:text-white transition ${activeTab === id ? 'text-emerald-200' : 'text-gray-400'}`}><i className="ph-bold ph-x text-xs"></i></button>)}
-                                            </div>
-                                        )}
-                                    </div>
-                                ))}
-                                <button onClick={addScenario} className="p-2 rounded-lg bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-emerald-600 transition" title="Add Option"><i className="ph-bold ph-plus"></i></button>
-                                <div className="w-px h-6 bg-gray-300 mx-2"></div>
-                                <button onClick={() => setActiveTab('compare')} className={`px-4 py-2 text-sm font-bold rounded-xl whitespace-nowrap transition-all ${activeTab === 'compare' ? 'bg-indigo-600 text-white shadow-md' : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100'}`}><i className="ph-bold ph-chart-line-up mr-2"></i>Comparison</button>
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <div class="space-y-6">
+                             <div class="bg-white/70 backdrop-blur-sm p-6 rounded-2xl shadow-sm border border-white/60">
+                                <h3 class="font-bold text-gray-800 flex items-center gap-2 mb-4 text-lg"><span class="bg-indigo-100 p-1.5 rounded-lg text-indigo-600">${icons.hammer}</span> Standard Specification</h3>
+                                <ul class="space-y-3 text-sm">
+                                    <li class="grid grid-cols-[80px_1fr] gap-2 border-b border-gray-100 pb-2"><span class="font-semibold text-gray-500">Floor</span> <span class="text-gray-900 font-medium">${current.specs.floor}</span></li>
+                                    <li class="grid grid-cols-[80px_1fr] gap-2 border-b border-gray-100 pb-2"><span class="font-semibold text-gray-500">Wall</span> <span class="text-gray-900 font-medium">${current.specs.wall}</span></li>
+                                    <li class="grid grid-cols-[80px_1fr] gap-2 border-b border-gray-100 pb-2"><span class="font-semibold text-gray-500">Sanitary</span> <span class="text-gray-900 font-medium">${current.specs.sanitary}</span></li>
+                                    <li class="grid grid-cols-[80px_1fr] gap-2 border-b border-gray-100 pb-2"><span class="font-semibold text-gray-500">Features</span> <span class="text-gray-900 font-medium">${current.specs.features}</span></li>
+                                </ul>
                             </div>
                         </div>
-                    </header>
-
-                    <main className="max-w-6xl mx-auto px-4 py-6">
-                        {activeTab === 'compare' ? (
-                            <div className="space-y-6 fade-in">
-                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                                    <div className="lg:col-span-2 space-y-6">
-                                        <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
-                                            <h3 className="font-bold text-gray-800 mb-4 flex items-center gap-2"><i className="ph-bold ph-chart-bar text-indigo-500"></i> เปรียบเทียบงบประมาณรายหมวดหมู่</h3>
-                                            <ComparisonBarChart scenarios={scenarios} scenarioIds={scenarioIds} scenarioMeta={scenarioMeta} categories={categories} />
-                                        </div>
-                                        {/* Comparison Cards with Image & Percentage */}
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            {comparisonStats.map((stat) => (
-                                                <div key={stat.id} className={`bg-white rounded-2xl border p-4 shadow-sm transition hover:shadow-md ${stat.isCheapest ? 'border-emerald-500 ring-1 ring-emerald-500' : 'border-gray-100'}`}>
-                                                    <div className="flex items-start gap-4">
-                                                        <div className="w-20 h-20 shrink-0 bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
-                                                            {stat.meta.coverImage ? (
-                                                                <img src={stat.meta.coverImage} className="w-full h-full object-cover" />
-                                                            ) : (
-                                                                <div className="w-full h-full flex items-center justify-center text-gray-300"><i className="ph-fill ph-image text-2xl"></i></div>
-                                                            )}
-                                                        </div>
-                                                        <div className="flex-1 min-w-0">
-                                                            <div className="flex justify-between items-start">
-                                                                <h4 className="font-bold text-gray-800 truncate pr-2" title={stat.meta.name}>{stat.meta.name}</h4>
-                                                                {stat.isCheapest ? (
-                                                                    <span className="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap">คุ้มที่สุด</span>
-                                                                ) : (
-                                                                    <span className="bg-red-50 text-red-600 text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap">+{stat.diffPercent.toFixed(1)}%</span>
-                                                                )}
-                                                            </div>
-                                                            <div className="mt-1 text-2xl font-black text-gray-900 tracking-tight">{formatNumber(stat.total)}</div>
-                                                            <div className="text-xs text-gray-400">บาท (ประมาณการ)</div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                    <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex flex-col">
-                                        <h3 className="font-bold text-gray-800 mb-6 text-center">สรุปความแตกต่าง</h3>
-                                        <div className="flex-1 flex flex-col gap-3">
-                                            <div className="bg-gray-50 p-4 rounded-xl text-center">
-                                                <div className="text-xs text-gray-400 uppercase mb-1">Global Risk Buffer</div>
-                                                <div className="text-xl font-bold text-amber-500">+{riskFactor}%</div>
-                                                <input type="range" min="0" max="30" value={riskFactor} onChange={(e) => setRiskFactor(parseInt(e.target.value))} className="range-slider mt-2" />
-                                            </div>
-                                            <div className="border-t border-gray-100 my-2"></div>
-                                            <p className="text-sm text-gray-500 leading-relaxed text-center">
-                                                {comparisonStats.find(s => s.isCheapest)?.meta.name} เป็นทางเลือกที่ใช้งบประมาณน้อยที่สุด โดยต่ำกว่าค่าเฉลี่ยประมาณ {formatNumber(
-                                                    (comparisonStats.reduce((a,b) => a + b.total, 0)/comparisonStats.length) - comparisonStats.find(s => s.isCheapest)?.total
-                                                )} บาท
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="fade-in">
-                                <KPICards total={currentDirectTotal} duration={scenarioMeta[activeTab].duration} items={bulkItems} />
-
-                                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                                    <div className="lg:col-span-8 space-y-6">
-                                        <div className="bg-white rounded-3xl overflow-hidden border border-gray-100 shadow-sm group relative">
-                                            {scenarioMeta[activeTab].coverImage ? (
-                                                <div className="h-48 lg:h-64 w-full relative">
-                                                    <img src={scenarioMeta[activeTab].coverImage} className="w-full h-full object-cover" />
-                                                    <div className="absolute inset-0 bg-black/20 group-hover:bg-black/40 transition flex items-center justify-center opacity-0 group-hover:opacity-100">
-                                                        <button onClick={() => fileInputRef.current.click()} className="bg-white/90 p-3 rounded-full shadow-lg text-gray-800 hover:scale-110 transition"><i className="ph-bold ph-pencil-simple text-xl"></i></button>
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                <div onClick={() => fileInputRef.current.click()} className="h-32 lg:h-64 w-full bg-gray-100 border-2 border-dashed border-gray-200 flex flex-col items-center justify-center cursor-pointer hover:bg-gray-200 transition">
-                                                    <i className="ph ph-image-square text-3xl lg:text-5xl text-gray-300 mb-2"></i>
-                                                    <span className="text-xs lg:text-sm font-bold text-gray-400">อัปโหลดภาพหน้าปก</span>
-                                                </div>
-                                            )}
-                                            <input type="file" ref={fileInputRef} onChange={handleImageUpload} className="hidden" accept="image/*" />
-                                        </div>
-
-                                        <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-                                            <div className="p-4 bg-gray-50 border-b border-gray-100 flex justify-between items-center flex-wrap gap-2">
-                                                <h3 className="font-bold flex items-center gap-2"><i className="ph-bold ph-list-numbers text-emerald-500"></i> รายการประมาณการ</h3>
-                                                <div className="flex gap-2">
-                                                    <button onClick={handleAddCategory} className="bg-white border border-gray-200 text-gray-600 px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm hover:bg-gray-50 flex items-center gap-1"><i className="ph-bold ph-plus-circle text-emerald-600"></i> เพิ่มหมวดหมู่</button>
-                                                    <button onClick={saveBulkItems} className="bg-emerald-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold shadow-md hover:bg-emerald-700 transition">บันทึกข้อมูล</button>
-                                                </div>
-                                            </div>
-                                            <div className="overflow-x-auto no-scrollbar">
-                                                <table className="w-full text-left text-sm">
-                                                    <thead className="bg-gray-50 text-gray-400 font-bold uppercase text-[10px]">
-                                                        <tr>
-                                                            <th className="px-6 py-3 w-1/3">หมวดหมู่</th>
-                                                            <th className="px-6 py-3 w-1/3">หมายเหตุ (เช่น 2 คน x 6 เดือน)</th>
-                                                            <th className="px-6 py-3 w-1/4 text-right">จำนวนเงิน (บาท)</th>
-                                                            <th className="w-10"></th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody className="divide-y divide-gray-100">
-                                                        {bulkItems.map((item, idx) => (
-                                                            <tr key={item.categoryId} className="hover:bg-blue-50/30 transition group">
-                                                                <td className="px-6 py-3">
-                                                                    <input type="text" value={categories[idx].name} onChange={(e) => handleCategoryNameChange(categories[idx].id, e.target.value)} className="w-full bg-transparent border-none outline-none text-gray-700 font-medium placeholder-gray-400 focus:text-blue-600" />
-                                                                </td>
-                                                                <td className="px-6 py-3">
-                                                                     <input 
-                                                                        type="text" 
-                                                                        value={item.remark || ""} 
-                                                                        onChange={(e) => handleBulkChange(idx, 'remark', e.target.value)} 
-                                                                        className="w-full bg-transparent border-b border-gray-100 focus:border-emerald-500 outline-none p-1 text-gray-500 text-xs" 
-                                                                        placeholder="ระบุรายละเอียด..."
-                                                                    />
-                                                                </td>
-                                                                <td className="px-6 py-3">
-                                                                    <input type="number" value={item.total} onChange={(e) => handleBulkChange(idx, 'total', e.target.value)} className="w-full text-right bg-transparent border-b border-gray-200 focus:border-emerald-500 outline-none p-1 font-bold text-gray-900" placeholder="0" />
-                                                                </td>
-                                                                <td className="px-2 text-center">
-                                                                    <button onClick={() => handleDeleteCategory(categories[idx].id, categories[idx].name)} className="text-gray-300 hover:text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition" title="ลบหมวดหมู่"><i className="ph-bold ph-trash text-lg"></i></button>
-                                                                </td>
-                                                            </tr>
-                                                        ))}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="lg:col-span-4 space-y-6">
-                                        <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-xl lg:sticky lg:top-24">
-                                            <div className="mb-6">
-                                                <div className="text-xs font-bold text-gray-400 uppercase mb-1 tracking-widest text-center">Total Estimated Budget</div>
-                                                <div className="text-4xl font-black text-emerald-600 tracking-tight text-center">{formatMoney(currentGrandTotal)}</div>
-                                                <div className="text-[10px] text-gray-400 text-center mt-1">{ThaiBahtText(currentGrandTotal)}</div>
-                                                <div className="h-1.5 w-full bg-gray-100 rounded-full mt-4 overflow-hidden">
-                                                    <div className="h-full bg-emerald-500 transition-all duration-1000" style={{ width: '100%' }}></div>
-                                                </div>
-                                            </div>
-                                            <div className="space-y-4 pt-4 border-t border-gray-100">
-                                                <div><label className="flex justify-between text-xs font-bold text-gray-500 mb-2 uppercase"><span>Project Duration (Months)</span><span className="text-gray-800 font-bold">{scenarioMeta[activeTab].duration} m</span></label><input type="range" min="1" max="36" value={scenarioMeta[activeTab].duration} onChange={(e) => handleMetaChange(activeTab, 'duration', e.target.value)} className="range-slider" /></div>
-                                                <div><label className="flex justify-between text-xs font-bold text-gray-500 mb-2 uppercase"><span>Risk Buffer</span><span className="text-amber-600 font-bold">+{riskFactor}%</span></label><input type="range" min="0" max="30" value={riskFactor} onChange={(e) => setRiskFactor(parseInt(e.target.value))} className="range-slider" /></div>
-                                                <div><label className="flex justify-between text-xs font-bold text-gray-500 mb-2 uppercase"><span>Markup / Overhead</span><span className="text-blue-600 font-bold">+{currentMarkup}%</span></label><input type="range" min="0" max="100" value={currentMarkup} onChange={(e) => handleMetaChange(activeTab, 'markup', e.target.value)} className="range-slider" /></div>
-                                            </div>
-                                            <div className="mt-8">
-                                                <h4 className="text-xs font-bold text-gray-400 uppercase mb-4 text-center tracking-widest">Distribution</h4>
-                                                <DonutChart data={chartData} total={currentDirectTotal} />
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                    </main>
-
-                    {/* Print Only Section */}
-                    <div className="hidden print:block fixed inset-0 z-[100] bg-white text-center p-20">
-                        <div className="h-full flex flex-col items-center justify-center border-[12px] border-emerald-600 p-10 rounded-[40px]">
-                            <i className="ph-fill ph-briefcase text-[120px] text-emerald-600 mb-6"></i>
-                            <h1 className="text-7xl font-black mb-6">{projectName}</h1>
-                            <div className="w-32 h-2.5 bg-gray-200 mb-10"></div>
-                            <p className="text-3xl text-gray-500 uppercase tracking-[0.8em] font-medium mb-12">Cost Proposal Report</p>
-                            <div className="grid grid-cols-2 gap-10 w-full max-w-4xl mt-16">
-                                {comparisonStats.map(stat => (
-                                    <div key={stat.id} className="text-left p-8 border-l-[10px] border-emerald-500 bg-gray-50 rounded-r-2xl">
-                                        <div className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-2">{stat.meta.name}</div>
-                                        <div className="text-4xl font-black text-gray-900">{formatMoney(stat.total)}</div>
-                                        {stat.isCheapest && <div className="text-emerald-600 font-bold mt-2 text-sm uppercase tracking-wider">★ Best Value</div>}
-                                    </div>
-                                ))}
-                            </div>
-                            <div className="mt-auto pt-10 text-gray-300 font-bold uppercase tracking-widest text-sm">Generated by Project Cost Management System v9.4</div>
+                        <div class="flex flex-col gap-4">
+                            <div class="bg-green-100/50 p-5 rounded-2xl border border-green-200/60"><h4 class="font-bold text-green-800 mb-2 text-sm">จุดเด่น (Highlights)</h4><ul class="space-y-1">${prosList}</ul></div>
                         </div>
                     </div>
                 </div>
-            );
-        };
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
+            `;
+        }
+
+        function renderPlan(current) {
+            const scale = 100;
+            const wPx = current.w * scale;
+            const lPx = current.l * scale;
+            
+            // Draw elements based on Type
+            let elements = '';
+            
+            // Grid & Wall
+            const base = `<defs><pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M 20 0 L 0 0 0 20" fill="none" stroke="#e2e8f0" stroke-width="1"/></pattern></defs><rect x="0" y="0" width="${wPx}" height="${lPx}" fill="url(#grid)" /><rect x="0" y="0" width="${wPx}" height="${lPx}" fill="none" stroke="#1e293b" stroke-width="4"/>`;
+            const door = `<path d="M ${wPx} ${lPx} L ${wPx-60} ${lPx} A 60 60 0 0 1 ${wPx} ${lPx-60}" fill="none" stroke="#94a3b8" stroke-width="2" stroke-dasharray="4"/>`;
+
+            // Function Specifics
+            if (current.type === "Shower") {
+                // Shower Zone
+                elements += `<rect x="5" y="5" width="${wPx-10}" height="80" fill="#e0f2fe" stroke="#38bdf8" stroke-width="2" stroke-dasharray="4"/>`;
+                elements += `<text x="${wPx/2}" y="50" text-anchor="middle" fill="#0369a1" font-size="12">Wet Zone</text>`;
+                // Toilet
+                elements += `<rect x="20" y="${lPx/2}" width="35" height="50" fill="white" stroke="#334155" stroke-width="2" rx="4"/>`;
+                // Sink
+                elements += `<rect x="5" y="${lPx-50}" width="50" height="35" fill="white" stroke="#334155" stroke-width="2" rx="2"/>`;
+            } 
+            else if (current.type === "Toilet") {
+                // No Shower
+                elements += `<rect x="${wPx/2 - 17}" y="20" width="35" height="50" fill="white" stroke="#334155" stroke-width="2" rx="4"/>`; // Toilet Top
+                elements += `<rect x="5" y="${lPx/2}" width="50" height="35" fill="white" stroke="#334155" stroke-width="2" rx="2"/>`; // Sink Side
+            }
+            else if (current.type === "Dry") {
+                // Urinal
+                elements += `<path d="M ${wPx-40} 30 Q ${wPx-20} 30 ${wPx-20} 50 Q ${wPx-20} 70 ${wPx-40} 70 Z" fill="white" stroke="#334155" stroke-width="2"/>`;
+                elements += `<text x="${wPx-50}" y="55" text-anchor="end" fill="#475569" font-size="10">Urinal</text>`;
+                // Toilet
+                elements += `<rect x="20" y="${lPx/2}" width="35" height="50" fill="white" stroke="#334155" stroke-width="2" rx="4"/>`;
+                // Sink
+                elements += `<rect x="5" y="${lPx-50}" width="50" height="35" fill="white" stroke="#334155" stroke-width="2" rx="2"/>`;
+            }
+
+            return `
+                <div class="animate-fade-in h-full flex flex-col items-center justify-center p-4">
+                    <div class="bg-white p-4 rounded-xl shadow-lg border border-slate-200">
+                        <h3 class="text-center font-bold text-slate-700 mb-2">LAYOUT: ${current.fullCode}</h3>
+                        <div class="overflow-auto bg-blueprint p-8 rounded-lg border-2 border-slate-700">
+                            <svg width="${wPx}" height="${lPx}" viewBox="0 0 ${wPx} ${lPx}" xmlns="http://www.w3.org/2000/svg" style="background:white;">
+                                ${base}
+                                ${elements}
+                                ${door}
+                                <text x="${wPx/2}" y="${lPx-5}" text-anchor="middle" font-size="10" fill="#64748b">${current.w}m</text>
+                            </svg>
+                        </div>
+                    </div>
+                </div>`;
+        }
+
+        function render3D(current) {
+            // Placeholder visuals based on type
+            let color = "e2e8f0";
+            if(current.id === 'T') color = "fef3c7";
+            if(current.id === 'U') color = "d1fae5";
+            
+            const imgUrl = `https://placehold.co/800x500/${color}/475569?text=3D+View+${current.fullCode}\\n(${current.thaiName})`;
+            
+            return `
+                <div class="animate-fade-in h-full flex flex-col items-center p-4">
+                    <div class="w-full max-w-3xl bg-white p-2 rounded-2xl shadow-xl border border-slate-200">
+                         <img src="${imgUrl}" alt="3D Render" class="w-full rounded-xl shadow-inner">
+                    </div>
+                    <p class="mt-4 text-slate-500">จำลองบรรยากาศสำหรับรุ่น ${current.fullCode}</p>
+                </div>`;
+        }
+
+        function renderDashboard() {
+            const contentArea = document.getElementById('content-area');
+            contentArea.className = "bg-slate-900 text-white p-6 md:p-10 rounded-3xl min-h-[600px]";
+            
+            // Compare all variants for the selected series
+            const series = seriesCatalog.find(s => s.id === selectedSeriesId);
+            const data = variants.map((v, i) => {
+                const calculated = Math.round(series.w * series.l * v.basePricePerSqm);
+                return { name: v.id, price: calculated, color: v.barColor };
+            });
+            const maxPrice = Math.max(...data.map(d => d.price)) * 1.2;
+
+            const bars = data.map(d => `
+                <div class="flex flex-col items-center gap-2 w-full group">
+                    <div class="relative w-full h-48 bg-slate-800/50 rounded-xl flex items-end justify-center px-4 pb-2">
+                        <div class="w-full ${d.color} rounded-t-md relative transition-all duration-700" style="height: ${(d.price/maxPrice)*100}%">
+                            <span class="absolute -top-6 left-1/2 -translate-x-1/2 text-xs font-bold text-slate-300 opacity-0 group-hover:opacity-100">${(d.price/1000).toFixed(1)}k</span>
+                        </div>
+                    </div>
+                    <div class="text-sm font-bold">${d.name}</div>
+                </div>
+            `).join('');
+
+            contentArea.innerHTML = `
+                <div class="animate-fade-in">
+                    <h2 class="text-3xl font-bold mb-2">Analytics: Series ${selectedSeriesId}</h2>
+                    <p class="text-slate-400 mb-8">เปรียบเทียบราคาประเมินระหว่าง Type ต่างๆ ในขนาดเดียวกัน</p>
+                    <div class="grid grid-cols-5 gap-4 items-end h-64 mb-8">${bars}</div>
+                </div>
+            `;
+        }
+
+        // Start
+        init();
+
     </script>
 </body>
 </html>
