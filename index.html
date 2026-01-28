@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BOQ Estimator Pro v5.1 (Upload Cover)</title>
+    <title>BOQ Estimator Pro v5.1 (Fixed Upload)</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -130,7 +130,7 @@
                             <div class="absolute inset-0 bg-gradient-to-t from-slate-900/90 via-slate-900/40 to-transparent"></div>
                             
                             <!-- Upload Button (Visible on Hover) -->
-                            <label class="absolute top-4 right-4 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full cursor-pointer opacity-0 group-hover/image:opacity-100 transition-opacity backdrop-blur-sm border border-white/20 shadow-lg" title="เปลี่ยนรูปปก">
+                            <label class="absolute top-4 right-4 bg-black/50 hover:bg-black/70 text-white p-2 rounded-full cursor-pointer opacity-0 group-hover/image:opacity-100 transition-opacity backdrop-blur-sm border border-white/20 shadow-lg z-20" title="เปลี่ยนรูปปก">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                                 <input type="file" @change="handleImageUpload" class="hidden" accept="image/*">
                             </label>
@@ -790,13 +790,30 @@
 
                 watch(activeTab, (newTab) => { if (newTab === 'comparison') renderChart(); });
 
+                // --- Image Upload Logic (Fix) ---
+                const handleImageUpload = (event) => {
+                    const file = event.target.files[0];
+                    if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            // Find the current room in the reactive rooms array
+                            const roomIndex = rooms.value.findIndex(r => r.id === selectedRoomId.value);
+                            if (roomIndex !== -1) {
+                                // Update customImage property
+                                rooms.value[roomIndex].customImage = e.target.result;
+                            }
+                        };
+                        reader.readAsDataURL(file);
+                    }
+                };
+
                 return {
                     activeTab, selectedRoomId, rooms, productCatalog, currentSelection, currentRoom,
                     currentCost, totalProjectCost, getTypeBadgeClass, getRoomDescription, getRoomImage,
                     addSanitaryItem, removeSanitaryItem, addAccessory, removeAccessory,
                     editItemPrice, saveCustomPrice, editingItemId, editPriceVal, editLaborVal,
                     formatNumber, getItemTotal, getPrice, calculateCost,
-                    showAddRoomModal, newRoomData, addNewRoom
+                    showAddRoomModal, newRoomData, addNewRoom, handleImageUpload
                 };
             }
         });
